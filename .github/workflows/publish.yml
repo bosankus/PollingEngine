@@ -1,0 +1,28 @@
+name: Publish SDK
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Set up Gradle
+        uses: gradle/gradle-build-action@v3
+
+      - name: Publish Android SDK to Maven
+        run: ./gradlew :pollingengine:publish
+
+      - name: Publish iOS SDK to CocoaPods
+        run: ./gradlew :pollingengine:publishToMavenLocal # or your iOS publishing command
+
