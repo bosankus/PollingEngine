@@ -49,6 +49,7 @@ import `in`.androidplay.pollingengine.polling.PollingEngine
 import `in`.androidplay.pollingengine.polling.PollingOutcome
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
+import kotlin.math.pow
 
 // ------- Models and helpers (moved above App to avoid any potential local-declaration parsing issues) -------
 
@@ -130,29 +131,36 @@ private fun PropertiesCard(
     overallTimeoutText: String, onOverallTimeoutChange: (String) -> Unit,
     perAttemptTimeoutText: String, onPerAttemptTimeoutChange: (String) -> Unit,
 ) {
-    Box(
+    Surface(
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
         modifier = Modifier
             .fillMaxWidth()
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(12.dp))
-            .border(
-                1.dp,
-                MaterialTheme.colorScheme.outline,
-                androidx.compose.foundation.shape.RoundedCornerShape(12.dp)
-            )
-            .background(MaterialTheme.colorScheme.surfaceVariant)
-            .padding(12.dp)
+            .padding(bottom = 2.dp)
     ) {
-        Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            verticalArrangement = Arrangement.spacedBy(16.dp)
+        ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                horizontalArrangement = Arrangement.spacedBy(24.dp)
             ) {
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    Text(
+                        "Delays & Attempts",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
                     LabeledField("initialDelayMs", initialDelayText, onInitialChange)
-                    LabeledField("multiplier", multiplierText, onMultiplierChange)
                     LabeledField("maxAttempts", maxAttemptsText, onMaxAttemptsChange)
                     LabeledField(
                         "perAttemptTimeoutMs",
@@ -162,9 +170,17 @@ private fun PropertiesCard(
                 }
                 Column(
                     modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(14.dp)
                 ) {
+                    Text(
+                        "Backoff & Timeouts",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
                     LabeledField("maxDelayMs", maxDelayText, onMaxDelayChange)
+                    LabeledField("multiplier", multiplierText, onMultiplierChange)
                     LabeledField("jitterRatio", jitterText, onJitterChange)
                     LabeledField("overallTimeoutMs", overallTimeoutText, onOverallTimeoutChange)
                 }
@@ -194,10 +210,29 @@ private fun <T> describeResult(result: PollingResult<T>): String = when (result)
 }
 
 private fun <T> describeOutcome(outcome: PollingOutcome<T>): String = when (outcome) {
-    is PollingOutcome.Success -> "Success(value=${outcome.value}, attempts=${outcome.attempts}, elapsedMs=${outcome.elapsedMs})"
-    is PollingOutcome.Exhausted -> "Exhausted(attempts=${outcome.attempts}, elapsedMs=${outcome.elapsedMs})"
-    is PollingOutcome.Timeout -> "Timeout(attempts=${outcome.attempts}, elapsedMs=${outcome.elapsedMs})"
-    is PollingOutcome.Cancelled -> "Cancelled(attempts=${outcome.attempts}, elapsedMs=${outcome.elapsedMs})"
+    is PollingOutcome.Success -> {
+        val secs = (outcome.elapsedMs / 100L).toFloat() / 10f
+        "Success(value=${outcome.value}, attempts=${outcome.attempts}, elapsedSec=${
+            ((kotlin.math.round(
+                secs * 10f
+            )) / 10f)
+        })"
+    }
+
+    is PollingOutcome.Exhausted -> {
+        val secs = (outcome.elapsedMs / 100L).toFloat() / 10f
+        "Exhausted(attempts=${outcome.attempts}, elapsedSec=${((kotlin.math.round(secs * 10f)) / 10f)})"
+    }
+
+    is PollingOutcome.Timeout -> {
+        val secs = (outcome.elapsedMs / 100L).toFloat() / 10f
+        "Timeout(attempts=${outcome.attempts}, elapsedSec=${((kotlin.math.round(secs * 10f)) / 10f)})"
+    }
+
+    is PollingOutcome.Cancelled -> {
+        val secs = (outcome.elapsedMs / 100L).toFloat() / 10f
+        "Cancelled(attempts=${outcome.attempts}, elapsedSec=${((kotlin.math.round(secs * 10f)) / 10f)})"
+    }
 }
 
 @Composable
@@ -362,14 +397,29 @@ fun App() {
                                 isTerminalSuccess = { value -> value.isNotEmpty() },
                                 backoff = backoff,
                                 onAttempt = { attempt, delayMs ->
-                                    appendLog("[info] Attempt #$attempt (after ${delayMs ?: 0} ms)")
+                                    // Calculate base (non-jittered) delay for this attempt
+                                    val baseDelay = (backoff.initialDelayMs *
+                                            backoff.multiplier.pow((attempt - 1).toDouble())
+                                            ).toLong().coerceAtMost(backoff.maxDelayMs)
+                                    val baseSecs = ((baseDelay) / 100L).toFloat() / 10f
+                                    val baseSecsStr =
+                                        ((kotlin.math.round(baseSecs * 10f)) / 10f).toString()
+
+                                    val actualDelay = delayMs ?: 0L
+                                    val actualSecs = (actualDelay / 100L).toFloat() / 10f
+                                    val actualSecsStr =
+                                        ((kotlin.math.round(actualSecs * 10f)) / 10f).toString()
+
+                                    appendLog("[info] Attempt #$attempt (base: ${baseSecsStr}s, actual: ${actualSecsStr}s)")
                                 },
                                 onResult = { attempt, result ->
                                     appendLog("[info] Result at #$attempt: ${describeResult(result)}")
                                 },
                                 onComplete = { attempts, durationMs, outcome ->
+                                    val secs = (durationMs / 100L).toFloat() / 10f
+                                    val secsStr = ((kotlin.math.round(secs * 10f)) / 10f).toString()
                                     appendLog(
-                                        "[done] Completed after $attempts attempts in $durationMs ms: ${
+                                        "[done] Completed after $attempts attempts in ${secsStr}s: ${
                                             describeOutcome(
                                                 outcome
                                             )

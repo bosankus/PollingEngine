@@ -6,7 +6,6 @@ import `in`.androidplay.pollingengine.models.PollingResult.Failure
 import `in`.androidplay.pollingengine.models.PollingResult.Success
 import `in`.androidplay.pollingengine.models.PollingResult.Unknown
 import `in`.androidplay.pollingengine.models.PollingResult.Waiting
-import kotlin.time.TimeSource
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -20,6 +19,7 @@ import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlin.time.TimeSource
 
 /**
  * Production-ready polling engine with exponential backoff and jitter.
@@ -40,11 +40,13 @@ public object PollingEngine {
 
     public suspend fun listActiveIds(): List<String> = mutex.withLock { active.keys.toList() }
 
-    public suspend fun cancel(id: String): Unit {
+    public suspend fun cancel(id: String) {
         mutex.withLock { active[id]?.cancel(CancellationException("Cancelled by user")) }
     }
 
-    public suspend fun cancel(handle: Handle): Unit { cancel(handle.id) }
+    public suspend fun cancel(handle: Handle) {
+        cancel(handle.id)
+    }
 
     public fun <T> startPolling(
         config: PollingConfig<T>,
@@ -91,13 +93,19 @@ public object PollingEngine {
                     val timeoutMs = config.backoff.perAttemptTimeoutMs
                     if (timeoutMs != null) {
                         withTimeout(minOf(timeoutMs, remainingOverall)) {
-                            config.metrics?.recordAttempt(attempt, if (attempt == 1) 0 else nextDelay)
-                            config.onAttempt(attempt, if (attempt == 1) 0 else nextDelay)
+                            // Preface only the first attempt immediately
+                            if (attempt == 1) {
+                                config.metrics?.recordAttempt(attempt, 0)
+                                config.onAttempt(attempt, 0)
+                            }
                             config.fetch()
                         }
                     } else {
-                        config.metrics?.recordAttempt(attempt, if (attempt == 1) 0 else nextDelay)
-                        config.onAttempt(attempt, if (attempt == 1) 0 else nextDelay)
+                        // Preface only the first attempt immediately
+                        if (attempt == 1) {
+                            config.metrics?.recordAttempt(attempt, 0)
+                            config.onAttempt(attempt, 0)
+                        }
                         config.fetch()
                     }
                 } catch (ce: CancellationException) {
@@ -163,6 +171,14 @@ public object PollingEngine {
                 val elapsedBeforeSleep = startMark.elapsedNow().inWholeMilliseconds
                 val remainingBeforeSleep = config.backoff.overallTimeoutMs - elapsedBeforeSleep
                 if (remainingBeforeSleep <= 0) break
+
+                // Provide the actual computed delay for the NEXT attempt's preface (attempt+1)
+                // Only announce if there is time left to sleep and another attempt could happen.
+                val nextAttemptIndex = attempt + 1
+                if (nextAttemptIndex <= config.backoff.maxAttempts) {
+                    config.metrics?.recordAttempt(nextAttemptIndex, sleepMs)
+                    config.onAttempt(nextAttemptIndex, sleepMs)
+                }
 
                 delay(minOf(sleepMs, remainingBeforeSleep))
             }
