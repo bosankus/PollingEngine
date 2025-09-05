@@ -4,7 +4,7 @@ plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
     kotlin("native.cocoapods")
-    id("org.jetbrains.dokka") version "1.9.20"
+    id("org.jetbrains.dokka") version "2.0.0"
     id("io.gitlab.arturbosch.detekt") version "1.23.6"
     id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
     id("maven-publish")
