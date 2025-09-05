@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html class="no-js">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>PollingConfig</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+    <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js","js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+    if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+            document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+    } else {
+        const savedDarkMode = JSON.parse(storage)
+        if(savedDarkMode === true) {
+            document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+    }
+    </script>
+<script type="text/javascript" src="https://unpkg.com/kotlin-playground@1/dist/playground.min.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../styles/font-jb-sans-auto.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/clipboard.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/symbol-parameters-wrapper_deferred.js" defer="defer"></script>
+</head>
+<body>
+    <div class="root">
+    <nav class="navigation theme-dark" id="navigation-wrapper">
+            <a class="library-name--link" href="../../../index.html">
+                    pollingengine
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+0.1.0        </div>
+        <div class="navigation-controls">
+        <div class="filter-section filter-section_loading" id="filter-section">
+                <button class="platform-tag platform-selector common-like" data-active=""
+                        data-filter=":pollingengine:dokkaHtml/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox">
+                    <div class="dropdown--header"><span>Platform filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close platform filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":pollingengine:dokkaHtml/commonMain"
+                                       data-filter=":pollingengine:dokkaHtml/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </div>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </nav>
+        <div id="container">
+            <div class="sidebar" id="leftColumn">
+                <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                    <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                        data-role="dropdown-listbox">
+                        <div class="dropdown--header">
+                            <span>
+                                    pollingengine
+                            </span>
+                            <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                                <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                            </button>
+                        </div>
+                        <div class="sidebar--inner" id="sideMenu"></div>
+                    </ul>
+                    <div class="dropdown--overlay"></div>
+                </div>
+            </div>
+            <div id="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="pollingengine::in.androidplay.pollingengine.polling/PollingConfig///PointingToDeclaration//1852534757">
+  <div class="breadcrumbs"><a href="../../../index.html">pollingengine</a><span class="delimiter">/</span><a href="../index.html">in.androidplay.pollingengine.polling</a><span class="delimiter">/</span><span class="current">PollingConfig</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Polling</span><wbr></wbr><span><span>Config</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">data </span><span class="token keyword">class </span><a href="index.html">PollingConfig</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter "><span class="token keyword">val </span>fetch<span class="token operator">: </span><span class="token keyword">suspend </span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>isTerminalSuccess<span class="token operator">: </span><span class="token punctuation">(</span><a href="index.html">T</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>shouldRetryOnError<span class="token operator">: </span><span class="token punctuation">(</span><a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span>{ true }<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>backoff<span class="token operator">: </span><a href="../-backoff-policy/index.html">BackoffPolicy</a><span class="token operator"> = </span>BackoffPolicy()<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>dispatcher<span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines/CoroutineDispatcher///PointingToDeclaration/">CoroutineDispatcher</span><span class="token operator"> = </span>Dispatchers.Default<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>onAttempt<span class="token operator">: </span><span class="token punctuation">(</span>attempt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>delayMs<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator"> = </span>{ _, _ -&gt; }<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>onResult<span class="token operator">: </span><span class="token punctuation">(</span>attempt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>result<span class="token operator">: </span><a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator"> = </span>{ _, _ -&gt; }<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>onComplete<span class="token operator">: </span><span class="token punctuation">(</span>attempts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>durationMs<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span>outcome<span class="token operator">: </span><a href="../-polling-outcome/index.html">PollingOutcome</a><span class="token operator">&lt;</span><span class="token keyword">out </span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator"> = </span>{ _, _, _ -&gt; }<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>throwableMapper<span class="token operator">: </span><span class="token punctuation">(</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a><span class="token operator"> = </span>{ t -&gt;
+        val msg = t.message ?: (t::class.simpleName ?: &quot;Throwable&quot;)
+        Error(ErrorCodes.UNKNOWN_ERROR_CODE, msg)
+    }<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>logger<span class="token operator">: </span><a href="../-logger/index.html">Logger</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter "><span class="token keyword">val </span>metrics<span class="token operator">: </span><a href="../-metrics/index.html">Metrics</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div><p class="paragraph">Configuration for the polling engine.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="CONSTRUCTOR">
+        <h2 class="">Constructors</h2>
+        <div class="table"><a data-name="587346470%2FConstructors%2F1852534757" anchor-label="PollingConfig" id="587346470%2FConstructors%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-togglable="CONSTRUCTOR" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="-polling-config.html"><span>Polling</span><wbr></wbr><span><span>Config</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="587346470%2FConstructors%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">constructor</span><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">fetch<span class="token operator">: </span><span class="token keyword">suspend </span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">, </span></span><span class="parameter ">isTerminalSuccess<span class="token operator">: </span><span class="token punctuation">(</span><a href="index.html">T</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token punctuation">, </span></span><span class="parameter ">shouldRetryOnError<span class="token operator">: </span><span class="token punctuation">(</span><a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a><span class="token operator"> = </span>{ true }<span class="token punctuation">, </span></span><span class="parameter ">backoff<span class="token operator">: </span><a href="../-backoff-policy/index.html">BackoffPolicy</a><span class="token operator"> = </span>BackoffPolicy()<span class="token punctuation">, </span></span><span class="parameter ">dispatcher<span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines/CoroutineDispatcher///PointingToDeclaration/">CoroutineDispatcher</span><span class="token operator"> = </span>Dispatchers.Default<span class="token punctuation">, </span></span><span class="parameter ">onAttempt<span class="token operator">: </span><span class="token punctuation">(</span>attempt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>delayMs<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator"> = </span>{ _, _ -&gt; }<span class="token punctuation">, </span></span><span class="parameter ">onResult<span class="token operator">: </span><span class="token punctuation">(</span>attempt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>result<span class="token operator">: </span><a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator"> = </span>{ _, _ -&gt; }<span class="token punctuation">, </span></span><span class="parameter ">onComplete<span class="token operator">: </span><span class="token punctuation">(</span>attempts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>durationMs<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span>outcome<span class="token operator">: </span><a href="../-polling-outcome/index.html">PollingOutcome</a><span class="token operator">&lt;</span><span class="token keyword">out </span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a><span class="token operator"> = </span>{ _, _, _ -&gt; }<span class="token punctuation">, </span></span><span class="parameter ">throwableMapper<span class="token operator">: </span><span class="token punctuation">(</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a><span class="token operator"> = </span>{ t -&gt;
+        val msg = t.message ?: (t::class.simpleName ?: &quot;Throwable&quot;)
+        Error(ErrorCodes.UNKNOWN_ERROR_CODE, msg)
+    }<span class="token punctuation">, </span></span><span class="parameter ">logger<span class="token operator">: </span><a href="../-logger/index.html">Logger</a><span class="token operator">?</span><span class="token operator"> = </span>null<span class="token punctuation">, </span></span><span class="parameter ">metrics<span class="token operator">: </span><a href="../-metrics/index.html">Metrics</a><span class="token operator">?</span><span class="token operator"> = </span>null</span></span><span class="token punctuation">)</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div data-togglable="PROPERTY">
+        <h2 class="">Properties</h2>
+        <div class="table"><a data-name="1000072264%2FProperties%2F1852534757" anchor-label="backoff" id="1000072264%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="backoff.html"><span><span>backoff</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1000072264%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="backoff.html">backoff</a><span class="token operator">: </span><a href="../-backoff-policy/index.html">BackoffPolicy</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="159093603%2FProperties%2F1852534757" anchor-label="dispatcher" id="159093603%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="dispatcher.html"><span><span>dispatcher</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="159093603%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="dispatcher.html">dispatcher</a><span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines/CoroutineDispatcher///PointingToDeclaration/">CoroutineDispatcher</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="179626422%2FProperties%2F1852534757" anchor-label="fetch" id="179626422%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="fetch.html"><span><span>fetch</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="179626422%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="fetch.html">fetch</a><span class="token operator">: </span><span class="token keyword">suspend </span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="644582899%2FProperties%2F1852534757" anchor-label="isTerminalSuccess" id="644582899%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="is-terminal-success.html"><span>is</span><wbr></wbr><span>Terminal</span><wbr></wbr><span><span>Success</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="644582899%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="is-terminal-success.html">isTerminalSuccess</a><span class="token operator">: </span><span class="token punctuation">(</span><a href="index.html">T</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="702471962%2FProperties%2F1852534757" anchor-label="logger" id="702471962%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="logger.html"><span><span>logger</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="702471962%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="logger.html">logger</a><span class="token operator">: </span><a href="../-logger/index.html">Logger</a><span class="token operator">?</span><span class="token operator"> = </span>null</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1562919693%2FProperties%2F1852534757" anchor-label="metrics" id="1562919693%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="metrics.html"><span><span>metrics</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1562919693%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="metrics.html">metrics</a><span class="token operator">: </span><a href="../-metrics/index.html">Metrics</a><span class="token operator">?</span><span class="token operator"> = </span>null</div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1503503746%2FProperties%2F1852534757" anchor-label="onAttempt" id="1503503746%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="on-attempt.html"><span>on</span><wbr></wbr><span><span>Attempt</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1503503746%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="on-attempt.html">onAttempt</a><span class="token operator">: </span><span class="token punctuation">(</span>attempt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>delayMs<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1662029554%2FProperties%2F1852534757" anchor-label="onComplete" id="1662029554%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="on-complete.html"><span>on</span><wbr></wbr><span><span>Complete</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1662029554%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="on-complete.html">onComplete</a><span class="token operator">: </span><span class="token punctuation">(</span>attempts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>durationMs<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span>outcome<span class="token operator">: </span><a href="../-polling-outcome/index.html">PollingOutcome</a><span class="token operator">&lt;</span><span class="token keyword">out </span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1755251698%2FProperties%2F1852534757" anchor-label="onResult" id="-1755251698%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="on-result.html"><span>on</span><wbr></wbr><span><span>Result</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1755251698%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="on-result.html">onResult</a><span class="token operator">: </span><span class="token punctuation">(</span>attempt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>result<span class="token operator">: </span><a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1934267210%2FProperties%2F1852534757" anchor-label="shouldRetryOnError" id="-1934267210%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="should-retry-on-error.html"><span>should</span><wbr></wbr><span>Retry</span><wbr></wbr><span>On</span><wbr></wbr><span><span>Error</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1934267210%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="should-retry-on-error.html">shouldRetryOnError</a><span class="token operator">: </span><span class="token punctuation">(</span><a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1560470255%2FProperties%2F1852534757" anchor-label="throwableMapper" id="1560470255%2FProperties%2F1852534757" data-filterable-set=":pollingengine:dokkaHtml/commonMain"></a>
+          <div class="table-row" data-filterable-current=":pollingengine:dokkaHtml/commonMain" data-filterable-set=":pollingengine:dokkaHtml/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="throwable-mapper.html"><span>throwable</span><wbr></wbr><span><span>Mapper</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1560470255%2FProperties%2F1852534757"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine:dokkaHtml/commonMain"><div class="symbol monospace"><span class="token keyword">val </span><a href="throwable-mapper.html">throwableMapper</a><span class="token operator">: </span><span class="token punctuation">(</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a></div><div class="brief "><p class="paragraph">Maps any thrown exception into a domain <a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a> used by retry predicates and reporting.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+        <span>© 2025 Copyright</span>
+        <span class="pull-right">
+            <span>Generated by </span>
+            <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                <span>dokka</span>
+            </a>
+        </span>
+    </div>
+            </div>
+        </div>
+    </div>
+</body>
+</html>
