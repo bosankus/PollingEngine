@@ -20,10 +20,9 @@ public data class PollingConfig<T>(
     /** Maps any thrown exception into a domain [Error] used by retry predicates and reporting. */
     val throwableMapper: (Throwable) -> Error = { t ->
         val msg = t.message ?: (t::class.simpleName ?: "Throwable")
-        Error(ErrorCodes.UNKNOWN_ERROR_CODE, msg)
+        // Use a stable public default code without exposing internal ErrorCodes
+        Error(-1, msg)
     },
-    val logger: Logger? = null,
-    val metrics: Metrics? = null,
 ) {
     init {
         requireNotNull(fetch) { "fetch must not be null" }

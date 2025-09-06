@@ -1,6 +1,8 @@
 # PollingEngine
 
-[![Maven Central](https://img.shields.io/maven-central/v/io.github.bosankus/pollingengine.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.bosankus/pollingengine)
+Last updated: 2025-09-07 02:33
+
+[![Maven Central](https://img.shields.io/maven-central/v/in.androidplay/pollingengine.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/in.androidplay/pollingengine)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-blue?logo=kotlin)
 [![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green.svg)](#license)
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-inactive.svg)](#setupbuild-instructions)
@@ -12,7 +14,6 @@ with:
 - Timeouts (overall and per‑attempt)
 - Cancellation and control APIs
 - Observability hooks (attempt/result/complete)
-- Pluggable logging and metrics
 
 Mermaid flow diagram (GitHub renders this):
 
@@ -37,6 +38,9 @@ flowchart TD
 
 ## Project Overview
 
+Note: Public API rename — PollingEngineApi has been renamed to PollingApi, and apps should use the
+facade object `Polling` instead of referencing `PollingEngine` directly.
+
 PollingEngine helps you repeatedly call a function until a condition is met or limits are reached.
 It is designed for long‑polling workflows like waiting for a server job to complete, checking
 payment status, etc.
@@ -54,7 +58,7 @@ Highlights:
 
 Coordinates on Maven Central:
 
-- groupId: io.github.bosankus
+- groupId: in.androidplay
 - artifactId: pollingengine
 - version: 0.1.0
 
@@ -62,14 +66,14 @@ Gradle Kotlin DSL (Android/shared):
 
 ```kotlin
 repositories { mavenCentral() }
-dependencies { implementation("io.github.bosankus:pollingengine:0.1.0") }
+dependencies { implementation("in.androidplay:pollingengine:0.1.0") }
 ```
 
 Gradle Groovy DSL:
 
 ```groovy
 repositories { mavenCentral() }
-dependencies { implementation "io.github.bosankus:pollingengine:0.1.0" }
+dependencies { implementation "in.androidplay:pollingengine:0.1.0" }
 ```
 
 Maven:
@@ -77,7 +81,7 @@ Maven:
 ```xml
 
 <dependency>
-    <groupId>io.github.bosankus</groupId>
+  <groupId>in.androidplay</groupId>
     <artifactId>pollingengine</artifactId>
     <version>0.1.0</version>
 </dependency>
@@ -112,17 +116,16 @@ cd iosApp && pod install
 Basic shared usage:
 
 ```kotlin
-import `in`.androidplay.pollingengine.models.PollingResult
-import `in`.androidplay.pollingengine.polling.*
 
 val config = pollingConfig<String> {
     fetch { /* return PollingResult<String> */ TODO() }
     success { it == "READY" }
-    retry(DefaultRetryPredicates.retryOnNetworkServerTimeout)
+    // Retry for common transient errors (network/server/timeout/unknown)
+    retry(RetryPredicates.networkOrServerOrTimeout)
     backoff(BackoffPolicies.quick20s)
 }
 
-suspend fun run(): PollingOutcome<String> = PollingEngine.pollUntil(config)
+suspend fun run(): PollingOutcome<String> = Polling.run(config)
 ```
 
 Android example (ViewModel + Compose):
@@ -139,7 +142,7 @@ class StatusViewModel : ViewModel() {
     }
 
     fun runOnce() = viewModelScope.launch {
-        _status.value = PollingEngine.pollUntil(config).toString()
+        _status.value = Polling.run(config).toString()
     }
 }
 ```
@@ -212,7 +215,7 @@ Publishing to Maven Central uses com.vanniktech.maven.publish.
 - Required environment variables/Gradle properties (typically set in CI):
     - OSSRH_USERNAME, OSSRH_PASSWORD
     - SIGNING_KEY (Base64 GPG private key), SIGNING_PASSWORD
-    - GROUP: io.github.bosankus (already configured)
+  - GROUP: in.androidplay (already configured)
 - Commands:
 
 ```bash
@@ -255,3 +258,46 @@ Copyright (c) 2025 AndroidPlay
 - Maintainer: @bosankus
 - Issues: use [GitHub Issues](https://github.com/bosankus/PollingEngine/issues)
 - Security: see [SECURITY.md](SECURITY.md)
+
+## Control APIs and Runtime Updates
+
+You can start background polling and control it via the Polling facade:
+
+```kotlin
+val handle = Polling.startPolling(config) { outcome ->
+    println("Outcome: $outcome")
+}
+
+// Pause/resume a running session
+kotlinx.coroutines.GlobalScope.launch { Polling.pause(handle.id) }
+kotlinx.coroutines.GlobalScope.launch { Polling.resume(handle.id) }
+
+// Update backoff policy at runtime
+kotlinx.coroutines.GlobalScope.launch {
+    Polling.updateBackoff(handle.id, BackoffPolicies.quick20s)
+}
+
+// Cancel by handle or by id
+kotlinx.coroutines.GlobalScope.launch { Polling.cancel(handle) }
+```
+
+## RetryPredicates examples
+
+Built-ins to reduce boilerplate:
+
+```kotlin
+// Retry for network/server/timeout/unknown errors (recommended)
+retry(RetryPredicates.networkOrServerOrTimeout)
+
+// Always retry on failures
+retry(RetryPredicates.always)
+
+// Never retry on failures
+retry(RetryPredicates.never)
+```
+
+## More documentation
+
+See the full developer guide with more examples and API overview:
+
+- docs/PollingEngine.md

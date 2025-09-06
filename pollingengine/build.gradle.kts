@@ -11,7 +11,7 @@ plugins {
     id("signing")
 }
 
-group = "io.github.bosankus"
+group = "in.androidplay"
 version = libs.versions.pollingengine.get()
 description = "PollingEngine KMP library providing robust polling with backoff and jitter"
 

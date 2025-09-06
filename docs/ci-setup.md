@@ -3,7 +3,7 @@
 Note: CI workflows and publishing configuration have been removed from this repository as part of a
 cleanup. This document is retained for reference only. Do not commit credentials or workflow files.
 
-Last updated: 2025-09-05
+Last updated: 2025-09-07 02:33
 
 This document explains how to set up Continuous Integration (CI) for this repository and how to publish the PollingEngine libraries to Maven Central (Android/KMP) and CocoaPods (iOS). It assumes you are using GitHub as the hosting platform.
 

@@ -3,36 +3,26 @@ package `in`.androidplay.pollingengine.polling
 import `in`.androidplay.pollingengine.models.Error
 import `in`.androidplay.pollingengine.models.PollingResult
 
-// --- Observability contracts ---
-public interface Logger {
-    public fun log(level: String, message: String, throwable: Throwable? = null): Unit
-}
-
-public interface Metrics {
-    public fun recordAttempt(attempt: Int, delayMs: Long?): Unit {}
-    public fun recordResult(attempt: Int, result: PollingResult<*>): Unit {}
-    public fun recordComplete(attempts: Int, durationMs: Long): Unit {}
-}
 
 // --- Internal error codes to decouple from external sources ---
-public object ErrorCodes {
-    public const val UNKNOWN_ERROR_CODE: Int = -1
-    public const val NETWORK_ERROR: Int = 1001
-    public const val SERVER_ERROR_CODE: Int = 500
-    public const val TIMEOUT_ERROR_CODE: Int = 1002
+internal object ErrorCodes {
+    internal const val UNKNOWN_ERROR_CODE: Int = -1
+    internal const val NETWORK_ERROR: Int = 1001
+    internal const val SERVER_ERROR_CODE: Int = 500
+    internal const val TIMEOUT_ERROR_CODE: Int = 1002
 }
 
 // --- Strategies ---
-public interface FetchStrategy<T> {
-    public suspend fun fetch(): PollingResult<T>
+internal interface FetchStrategy<T> {
+    suspend fun fetch(): PollingResult<T>
 }
 
-public interface SuccessStrategy<T> {
-    public fun isTerminal(value: T): Boolean
+internal interface SuccessStrategy<T> {
+    fun isTerminal(value: T): Boolean
 }
 
-public interface RetryStrategy {
-    public fun shouldRetry(error: Error?): Boolean
+internal interface RetryStrategy {
+    fun shouldRetry(error: Error?): Boolean
 }
 
 internal class LambdaFetchStrategy<T>(private val block: suspend () -> PollingResult<T>) : FetchStrategy<T> {
@@ -47,12 +37,15 @@ internal class LambdaRetryStrategy(private val predicate: (Error?) -> Boolean) :
     override fun shouldRetry(error: Error?): Boolean = predicate(error)
 }
 
-// --- Default retry predicates ---
-public object DefaultRetryPredicates {
+/**
+ * Common retry strategies for polling. Use these to avoid boilerplate and ensure consistency.
+ */
+public object RetryPredicates {
     /**
-     * Retry for network-related, server and timeout errors; also retries unknowns by default.
+     * Retry for network-related, server, timeout, and unknown errors.
+     * Recommended for most network polling scenarios.
      */
-    public val retryOnNetworkServerTimeout: (Error?) -> Boolean = { err ->
+    public val networkOrServerOrTimeout: (Error?) -> Boolean = { err ->
         when (err?.code) {
             ErrorCodes.NETWORK_ERROR, ErrorCodes.SERVER_ERROR_CODE, ErrorCodes.TIMEOUT_ERROR_CODE, ErrorCodes.UNKNOWN_ERROR_CODE -> true
             else -> false
