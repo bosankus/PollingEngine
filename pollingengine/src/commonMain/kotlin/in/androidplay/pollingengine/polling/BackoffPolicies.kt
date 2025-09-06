@@ -13,8 +13,8 @@ public object BackoffPolicies {
         maxDelayMs = 5_000,
         multiplier = 1.8,
         jitterRatio = 0.2,
-        maxAttempts = 20, // also bounded by overallTimeoutMs
+        maxAttempts = 20,
         overallTimeoutMs = 20_000,
-        perAttemptTimeoutMs = null,
+        perAttemptTimeoutMs = 10000,
     )
 }

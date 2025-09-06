@@ -17,7 +17,14 @@ public class PollingConfigBuilder<T> {
     private var dispatcher: CoroutineDispatcher = Dispatchers.Default
     private var onAttemptHook: (attempt: Int, delayMs: Long?) -> Unit = { _, _ -> }
     private var onResultHook: (attempt: Int, result: PollingResult<T>) -> Unit = { _, _ -> }
-    private var onCompleteHook: (attempts: Int, durationMs: Long, outcome: PollingOutcome<out T>) -> Unit = { _, _, _ -> }
+    private var onCompleteHook: (attempts: Int, durationMs: Long, outcome: PollingOutcome<T>) -> Unit =
+        { _, _, _ -> }
+    private var throwableMapper: (Throwable) -> Error = { t ->
+        val msg = t.message ?: (t::class.simpleName ?: "Throwable")
+        Error(ErrorCodes.UNKNOWN_ERROR_CODE, msg)
+    }
+    private var logger: Logger? = null
+    private var metrics: Metrics? = null
 
     public fun fetch(block: suspend () -> PollingResult<T>): PollingConfigBuilder<T> = apply {
         this.fetchStrategy = LambdaFetchStrategy(block)
@@ -51,6 +58,18 @@ public class PollingConfigBuilder<T> {
         this.dispatcher = dispatcher
     }
 
+    public fun throwableMapper(mapper: (Throwable) -> Error): PollingConfigBuilder<T> = apply {
+        this.throwableMapper = mapper
+    }
+
+    public fun logger(logger: Logger?): PollingConfigBuilder<T> = apply {
+        this.logger = logger
+    }
+
+    public fun metrics(metrics: Metrics?): PollingConfigBuilder<T> = apply {
+        this.metrics = metrics
+    }
+
     public fun onAttempt(hook: (attempt: Int, delayMs: Long?) -> Unit): PollingConfigBuilder<T> = apply {
         this.onAttemptHook = hook
     }
@@ -59,7 +78,8 @@ public class PollingConfigBuilder<T> {
         this.onResultHook = hook
     }
 
-    public fun onComplete(hook: (attempts: Int, durationMs: Long, outcome: PollingOutcome<out T>) -> Unit): PollingConfigBuilder<T> = apply {
+    public fun onComplete(hook: (attempts: Int, durationMs: Long, outcome: PollingOutcome<T>) -> Unit): PollingConfigBuilder<T> =
+        apply {
         this.onCompleteHook = hook
     }
 
@@ -76,6 +96,13 @@ public class PollingConfigBuilder<T> {
             onAttempt = onAttemptHook,
             onResult = onResultHook,
             onComplete = onCompleteHook,
+            throwableMapper = throwableMapper,
+            logger = logger,
+            metrics = metrics,
         )
     }
 }
+
+/** DSL entrypoint to build a PollingConfig in a concise way. */
+public fun <T> pollingConfig(block: PollingConfigBuilder<T>.() -> Unit): PollingConfig<T> =
+    PollingConfigBuilder<T>().apply(block).build()

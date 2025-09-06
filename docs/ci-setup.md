@@ -1,4 +1,7 @@
-# CI and Release Setup Guide
+# [ARCHIVED] CI and Release Setup Guide
+
+Note: CI workflows and publishing configuration have been removed from this repository as part of a
+cleanup. This document is retained for reference only. Do not commit credentials or workflow files.
 
 Last updated: 2025-09-05
 
@@ -13,7 +16,8 @@ Context: The Gradle build for `:pollingengine` already includes publishing and s
 - GitHub repository admin access
 - Java 11 (used by the build)
 - A Mac runner is required for iOS/Kotlin/Native tasks (GitHub-hosted `macos-latest` works)
-- Sonatype/OSSRH account with access to your `groupId` (e.g., `in.androidplay`)
+- Maven Central Portal account with access to your groupId and Central Portal credentials (e.g.,
+  `in.androidplay`)
 - GPG key for signing artifacts (public key published to a keyserver)
 - CocoaPods installed locally for validation (optional in CI, but required for `pod trunk push`)
 
@@ -27,11 +31,15 @@ These steps help you validate before pushing tags that trigger release.
    - signing.keyId=YOUR_KEY_ID
    - signing.password=YOUR_GPG_PASSPHRASE
    - signing.key=-----BEGIN PGP PRIVATE KEY BLOCK-----\n...\n-----END PGP PRIVATE KEY BLOCK-----
-   - ossrhUsername=YOUR_SONATYPE_USERNAME
-   - ossrhPassword=YOUR_SONATYPE_PASSWORD
+   # Optional legacy path (not recommended): if you have a key ring file, you can set
+   # signing.secretKeyRingFile=/path/to/your_secret.gpg
+   # The build will load it into memory; no
+   `gpg` binary is required. Do NOT set signing.useGpg unless you want to use system gpg.
+    - mavenCentralUsername=YOUR_CENTRAL_PORTAL_USERNAME
+    - mavenCentralPassword=YOUR_CENTRAL_PORTAL_PASSWORD
 
-2. Dry-run a local publish to Sonatype staging (optional):
-   - ./gradlew :pollingengine:publishToSonatype closeAndReleaseSonatypeStagingRepository
+2. Dry-run a local publish (legacy direct):
+    - ./gradlew :pollingengine:publish
 
 3. Generate docs locally:
    - ./gradlew :pollingengine:dokkaHtml
@@ -47,8 +55,9 @@ These steps help you validate before pushing tags that trigger release.
 Set these secrets in your GitHub repository under Settings → Security → Secrets and variables → Actions → New repository secret.
 
 Core publishing:
-- OSSRH_USERNAME: Sonatype (OSSRH) username
-- OSSRH_PASSWORD: Sonatype (OSSRH) password
+
+- MAVEN_CENTRAL_USERNAME: Central Portal username
+- MAVEN_CENTRAL_PASSWORD: Central Portal password
 - SIGNING_KEY_ID: Your GPG key ID (short or long ID as used by Gradle signing)
 - SIGNING_PASSWORD: Passphrase for the GPG private key
 - SIGNING_KEY: ASCII-armored GPG private key contents (single line or multiline; ensure proper YAML quoting in workflow if needed)
@@ -71,16 +80,16 @@ The Gradle signing and publishing configuration will read credentials from Gradl
 - ORG_GRADLE_PROJECT_signing.keyId → SIGNING_KEY_ID
 - ORG_GRADLE_PROJECT_signing.password → SIGNING_PASSWORD
 - ORG_GRADLE_PROJECT_signing.key → SIGNING_KEY
-- ORG_GRADLE_PROJECT_ossrhUsername → OSSRH_USERNAME
-- ORG_GRADLE_PROJECT_ossrhPassword → OSSRH_PASSWORD
+- ORG_GRADLE_PROJECT_mavenCentralUsername → MAVEN_CENTRAL_USERNAME
+- ORG_GRADLE_PROJECT_mavenCentralPassword → MAVEN_CENTRAL_PASSWORD
 
 Workflows should map secrets to these env vars, e.g.:
 - env:
   - ORG_GRADLE_PROJECT_signing.keyId: ${{ secrets.SIGNING_KEY_ID }}
   - ORG_GRADLE_PROJECT_signing.password: ${{ secrets.SIGNING_PASSWORD }}
   - ORG_GRADLE_PROJECT_signing.key: ${{ secrets.SIGNING_KEY }}
-  - ORG_GRADLE_PROJECT_ossrhUsername: ${{ secrets.OSSRH_USERNAME }}
-  - ORG_GRADLE_PROJECT_ossrhPassword: ${{ secrets.OSSRH_PASSWORD }}
+  - ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+  - ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
 
 This allows Gradle to pick them up without committing anything sensitive.
 
@@ -100,7 +109,8 @@ B) Release workflow (tag-driven):
 - Trigger: push tag `v*` (e.g., `v0.1.0`)
 - macOS runner (needed for K/N):
   - Set env vars from secrets (see section 4)
-  - Build artifacts: `./gradlew clean build :pollingengine:assembleReleaseXCFramework :pollingengine:publishToSonatype closeAndReleaseSonatypeStagingRepository :pollingengine:dokkaHtml`
+  - Build artifacts:
+    `./gradlew clean build :pollingengine:assembleReleaseXCFramework :pollingengine:publish :pollingengine:dokkaHtml`
   - Upload Dokka site and build artifacts as GitHub Release assets (optional)
   - Optionally publish gh-pages docs if you maintain a docs site
 
@@ -121,7 +131,8 @@ C) Optional CocoaPods publish job:
 - Create and push a tag `vX.Y.Z`:
   - git tag v0.1.0
   - git push origin v0.1.0
-- CI release workflow publishes to Sonatype and closes/releases the staging repo
+- CI release workflow publishes to Maven Central (Central Portal) and closes/releases the staging
+  repository
 - Wait for Maven Central sync (can take up to ~2 hours)
 
 2) CocoaPods release:
@@ -142,14 +153,16 @@ C) Optional CocoaPods publish job:
 - ./gradlew :pollingengine:assembleReleaseXCFramework
 - ./gradlew :pollingengine:podspec
 - pod lib lint pollingengine/pollingengine.podspec --allow-warnings (optional)
-- ./gradlew :pollingengine:publishToSonatype closeAndReleaseSonatypeStagingRepository (optional dry-run with real creds)
+- ./gradlew :pollingengine:publishAllPublicationsToMavenCentralRepository :pollingengine:
+  closeAndReleaseMavenCentralStagingRepository (optional dry-run with real creds)
 
 ---
 
 ## 8) Troubleshooting
 
 - Signing errors (e.g., "No appropriate signing key"): Verify SIGNING_KEY, SIGNING_KEY_ID, and SIGNING_PASSWORD are set and correctly mapped to ORG_GRADLE_PROJECT_* env vars.
-- Sonatype errors (401/403): Verify OSSRH_USERNAME/OSSRH_PASSWORD and groupId ownership.
+- Central Portal errors (401/403): Verify MAVEN_CENTRAL_USERNAME/MAVEN_CENTRAL_PASSWORD and groupId
+  ownership.
 - iOS build failures on Linux runners: Use macOS runners for Kotlin/Native iOS tasks.
 - CocoaPods push rejection: Ensure the spec version matches a git tag, the homepage and source URLs are reachable, and that you’re registered on CocoaPods trunk.
 - Dokka task issues: Ensure the Dokka plugin version matches the Kotlin version; re-run `./gradlew :pollingengine:dokkaHtml` with `--info` for details.
@@ -163,7 +176,7 @@ Common Gradle tasks you’ll use:
 - Lint and static analysis: `./gradlew detekt ktlintCheck`
 - API check (if configured): `./gradlew apiCheck`
 - Dokka docs: `./gradlew :pollingengine:dokkaHtml`
-- Publish to Sonatype: `./gradlew :pollingengine:publishToSonatype closeAndReleaseSonatypeStagingRepository`
+- Publish to Maven Central (legacy direct): `./gradlew :pollingengine:publish`
 - Generate Podspec: `./gradlew :pollingengine:podspec`
 - Build XCFramework: `./gradlew :pollingengine:assembleReleaseXCFramework`
 

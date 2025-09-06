@@ -51,5 +51,5 @@ Pod::Spec.new do |spec|
         }
     ]
     spec.license = { :type => 'Apache-2.0', :file => 'LICENSE' }
-    spec.authors = { 'AndroidPlay' => 'opensource@androidplay.in' }
+    spec.authors = { 'AndroidPlay' => 'ankush@androidplay.in' }
 end

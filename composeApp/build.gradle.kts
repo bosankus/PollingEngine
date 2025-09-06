@@ -31,6 +31,7 @@ kotlin {
         }
         commonMain.dependencies {
             implementation(project(":pollingengine"))
+            //implementation(libs.pollingengine)
             implementation(compose.runtime)
             implementation(compose.foundation)
             implementation(compose.material3)
@@ -39,7 +40,7 @@ kotlin {
             implementation(compose.components.uiToolingPreview)
             implementation(libs.androidx.lifecycle.viewmodelCompose)
             implementation(libs.androidx.lifecycle.runtimeCompose)
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+            implementation(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
@@ -65,7 +66,7 @@ android {
     }
     buildTypes {
         getByName("release") {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
         }
     }
     compileOptions {
@@ -75,6 +76,6 @@ android {
 }
 
 dependencies {
+    implementation(project(":pollingengine"))
     debugImplementation(compose.uiTooling)
 }
-

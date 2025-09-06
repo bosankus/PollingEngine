@@ -16,7 +16,7 @@ public data class PollingConfig<T>(
     val dispatcher: CoroutineDispatcher = Dispatchers.Default,
     val onAttempt: (attempt: Int, delayMs: Long?) -> Unit = { _, _ -> },
     val onResult: (attempt: Int, result: PollingResult<T>) -> Unit = { _, _ -> },
-    val onComplete: (attempts: Int, durationMs: Long, outcome: PollingOutcome<out T>) -> Unit = { _, _, _ -> },
+    val onComplete: (attempts: Int, durationMs: Long, outcome: PollingOutcome<T>) -> Unit = { _, _, _ -> },
     /** Maps any thrown exception into a domain [Error] used by retry predicates and reporting. */
     val throwableMapper: (Throwable) -> Error = { t ->
         val msg = t.message ?: (t::class.simpleName ?: "Throwable")

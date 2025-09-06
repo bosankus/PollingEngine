@@ -1,170 +1,257 @@
-This is a Kotlin Multiplatform project targeting Android, iOS.
+# PollingEngine
 
-* [/composeApp](./composeApp/src) is for code that will be shared across your Compose Multiplatform applications.
-  It contains several subfolders:
-  - [commonMain](./composeApp/src/commonMain/kotlin) is for code that’s common for all targets.
-  - Other folders are for Kotlin code that will be compiled for only the platform indicated in the folder name.
-    For example, if you want to use Apple’s CoreCrypto for the iOS part of your Kotlin app,
-    the [iosMain](./composeApp/src/iosMain/kotlin) folder would be the right place for such calls.
-    Similarly, if you want to edit the Desktop (JVM) specific part, the [jvmMain](./composeApp/src/jvmMain/kotlin)
-    folder is the appropriate location.
+[![Maven Central](https://img.shields.io/maven-central/v/io.github.bosankus/pollingengine.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/io.github.bosankus/pollingengine)
+![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-blue?logo=kotlin)
+[![License: Apache-2.0](https://img.shields.io/badge/License-Apache--2.0-green.svg)](#license)
+[![CI](https://img.shields.io/badge/CI-GitHub%20Actions-inactive.svg)](#setupbuild-instructions)
 
-* [/iosApp](./iosApp/iosApp) contains iOS applications. Even if you’re sharing your UI with Compose Multiplatform,
-  you need this entry point for your iOS app. This is also where you should add SwiftUI code for your project.
+A Kotlin Multiplatform library for Android and iOS that provides a production‑ready polling engine
+with:
 
-### Build and Run Android Application
+- Exponential backoff and jitter
+- Timeouts (overall and per‑attempt)
+- Cancellation and control APIs
+- Observability hooks (attempt/result/complete)
+- Pluggable logging and metrics
 
-To build and run the development version of the Android app, use the run configuration from the run widget
-in your IDE’s toolbar or build it directly from the terminal:
-- on macOS/Linux
-  ```shell
-  ./gradlew :composeApp:assembleDebug
-  ```
-- on Windows
-  ```shell
-  .\gradlew.bat :composeApp:assembleDebug
-  ```
+Mermaid flow diagram (GitHub renders this):
 
-### Build and Run iOS Application
+```mermaid
+flowchart TD
+    A[Start] --> B{Attempt fetch}
+    B -->|Success & meets success predicate| C[Outcome: Success]
+    B -->|Failure & retryable| D[Backoff delay]
+    B -->|Failure & not retryable| E[Outcome: Exhausted]
+    B -->|Timeout reached| F[Outcome: Timeout]
+    D --> G{More attempts left?}
+    G -->|Yes| B
+    G -->|No| E
+    %% External control
+    B -. pause/resume/cancel .-> H[Control APIs]
+```
 
-To build and run the development version of the iOS app, use the run configuration from the run widget
-in your IDE’s toolbar or open the [/iosApp](./iosApp) directory in Xcode and run it from there.
+- Modules:
+    - [/pollingengine](./pollingengine) — library code
+    - [/composeApp](./composeApp/src) — sample shared UI (Compose Multiplatform)
+    - [/iosApp](./iosApp/iosApp) — iOS app entry (SwiftUI)
 
-### iOS Simulator/CoreSimulator Troubleshooting
+## Project Overview
 
-If you see errors like:
+PollingEngine helps you repeatedly call a function until a condition is met or limits are reached.
+It is designed for long‑polling workflows like waiting for a server job to complete, checking
+payment status, etc.
 
-- "CoreSimulator.framework was changed while the process was running. Service version (1010.15) does not match expected service version (947.17)."
-- "Connection refused"
+Platforms: Kotlin Multiplatform (common code) with Android and iOS targets.
 
-This indicates your active Xcode's CoreSimulator service doesn't match the running Simulator/runtime. This can happen if Xcode auto-updated in the background or you have multiple Xcode versions installed.
+Highlights:
 
-Quick fix (recommended):
+- Simple DSL with pollingConfig { … }
+- Backoff presets (e.g., BackoffPolicies.quick20s)
+- Control operations: pause(id), resume(id), cancel(handle/id), cancelAll(), shutdown()
+- Domain‑level results via PollingResult and terminal PollingOutcome
 
-- Run the helper script which resets CoreSimulator and clears caches.
-  ```bash
-  chmod +x scripts/fix-ios-simulator.sh
-  # optionally pass an Xcode path to switch the active Xcode
-  ./scripts/fix-ios-simulator.sh                     # just reset
-  # sudo ./scripts/fix-ios-simulator.sh /Applications/Xcode.app
-  ```
-- Reopen Xcode and Simulator, then re-run the app.
+## Installation and Dependency
 
-Manual steps (if you prefer to do it yourself):
+Coordinates on Maven Central:
 
-1) Ensure the right Xcode is active:
-   ```bash
-   xcode-select -p
-   sudo xcode-select -s /Applications/Xcode.app
-   ```
-2) Close Simulator and kill CoreSimulator services:
-   ```bash
-   killall -9 Simulator || true
-   killall -9 com.apple.CoreSimulator.CoreSimulatorService || true
-   launchctl remove com.apple.CoreSimulator.CoreSimulatorService || true
-   ```
-3) Shutdown and erase simulators (warning: removes simulator data):
-   ```bash
-   xcrun simctl shutdown all || true
-   xcrun simctl erase all || true
-   ```
-4) Clear Xcode DerivedData:
-   ```bash
-   rm -rf ~/Library/Developer/Xcode/DerivedData
-   ```
-5) Reopen Xcode/Simulator and try again.
+- groupId: io.github.bosankus
+- artifactId: pollingengine
+- version: 0.1.0
 
-Notes:
-- Ensure your Simulator runtime version matches your active Xcode (xcrun simctl list runtimes).
-- Our iOS deployment target is currently set to 18.2 in the Xcode project; use an iOS 18.x simulator (e.g., 18.6).
-- If the issue recurs, run the script again after Xcode updates.
+Gradle Kotlin DSL (Android/shared):
 
----
+```kotlin
+repositories { mavenCentral() }
+dependencies { implementation("io.github.bosankus:pollingengine:0.1.0") }
+```
 
-### Observability and hooks (PollingEngine)
+Gradle Groovy DSL:
 
-PollingEngine provides optional observability without forcing any logging dependency:
+```groovy
+repositories { mavenCentral() }
+dependencies { implementation "io.github.bosankus:pollingengine:0.1.0" }
+```
 
-- onAttempt(attempt, delayMs): called just before each fetch attempt is executed. delayMs is 0 on the first attempt; subsequent attempts include the planned sleep before the attempt.
-- onResult(attempt, result): called after each attempt with the PollingResult produced by fetch.
-- onComplete(attempts, durationMs, outcome): called once when polling reaches a terminal outcome (Success, Exhausted, Timeout, or Cancelled).
+Maven:
 
-Threading and timing:
-- All hooks run on the dispatcher configured in PollingConfig (default: Dispatchers.Default).
-- onAttempt and Metrics.recordAttempt are invoked immediately before calling fetch (or inside withTimeout if perAttemptTimeoutMs is set).
-- onResult is invoked immediately after fetch completes or fails and has been mapped to a PollingResult.
-- onComplete is invoked right after the terminal outcome is determined.
+```xml
 
-Optional interfaces you can implement:
-- Logger: a simple logging callback interface you can pass via PollingConfig.logger (no logging library required).
-- Metrics: callbacks to record attempts, results, and completion; used by PollingEngine if provided.
-
-Learn more about [Kotlin Multiplatform](https://www.jetbrains.com/help/kotlin-multiplatform-dev/get-started.html)…
-
----
-
-## Installation
-
-Currently, the library is consumed as a project dependency inside this repo. Once published to Maven Central, use:
-
-- Gradle (Kotlin DSL):
-  ```kotlin
-  repositories { mavenCentral() }
-  dependencies { implementation("in.androidplay:pollingengine:0.1.0") }
-  ```
-- Maven:
-  ```xml
-  <dependency>
-    <groupId>in.androidplay</groupId>
+<dependency>
+    <groupId>io.github.bosankus</groupId>
     <artifactId>pollingengine</artifactId>
     <version>0.1.0</version>
-  </dependency>
-  ```
-
-iOS consumption options (to be published):
-- CocoaPods (planned):
-  ```ruby
-  pod 'PollingEngine', '~> 0.1'
-  ```
-- Swift Package Manager (binary XCFramework, planned): add the Git tag `vX.Y.Z` and use Package.swift provided in release notes.
-
-## Quick start (Kotlin)
-
-```
-import in.androidplay.pollingengine.models.PollingResult
-import in.androidplay.pollingengine.polling.BackoffPolicies
-import in.androidplay.pollingengine.polling.PollingConfigBuilder
-import in.androidplay.pollingengine.polling.PollingEngine
-
-// Your fetcher should return PollingResult<T>
-suspend fun fetchStatus(): PollingResult<String> = TODO()
-
-val config = PollingConfigBuilder<String>()
-    .fetch { fetchStatus() }
-    .success { value -> value == "READY" }
-    .retry { error -> true } // customize as needed
-    .backoff(BackoffPolicies.quick20s)
-    .onAttempt { attempt, delay -> println("Attempt #$attempt (delay=$delay ms)") }
-    .onResult { attempt, result -> println("Result@$attempt = $result") }
-    .onComplete { attempts, duration, outcome -> println("Done in $attempts attempts after ${duration}ms: $outcome") }
-    .build()
-
-// Use pollUntil in a coroutine
-val outcome = PollingEngine.pollUntil(config)
+</dependency>
 ```
 
-## Semantic Versioning
+iOS integration options:
 
-This project follows Semantic Versioning (MAJOR.MINOR.PATCH):
-- MAJOR: incompatible API changes
-- MINOR: backwards-compatible functionality
-- PATCH: backwards-compatible bug fixes
+- CocoaPods (from this repository during development):
 
-Public API changes are guarded using Kotlin Binary Compatibility Validator. API checks run in CI when a baseline is present.
+```ruby
+# Podfile (example)
+platform :ios, '14.0'
+use_frameworks!
 
----
+target 'YourApp' do
+  pod 'pollingengine', :path => '../pollingengine'
+end
+```
 
-## CI and Release Setup
+Then:
 
-For step-by-step instructions on configuring CI and publishing the libraries (Maven Central and CocoaPods), see:
-- docs/ci-setup.md
+```bash
+./gradlew :pollingengine:generateDummyFramework
+cd iosApp && pod install
+```
+
+- Swift Package Manager: If you publish an XCFramework, add the package URL and version in Xcode. (
+  SPM publication is not configured in this repo out‑of‑the‑box.)
+
+## Usage
+
+Basic shared usage:
+
+```kotlin
+import `in`.androidplay.pollingengine.models.PollingResult
+import `in`.androidplay.pollingengine.polling.*
+
+val config = pollingConfig<String> {
+    fetch { /* return PollingResult<String> */ TODO() }
+    success { it == "READY" }
+    retry(DefaultRetryPredicates.retryOnNetworkServerTimeout)
+    backoff(BackoffPolicies.quick20s)
+}
+
+suspend fun run(): PollingOutcome<String> = PollingEngine.pollUntil(config)
+```
+
+Android example (ViewModel + Compose):
+
+```kotlin
+class StatusViewModel : ViewModel() {
+    private val _status = MutableStateFlow("Idle")
+    val status: StateFlow<String> = _status
+
+    private val config = pollingConfig<String> {
+        fetch { TODO("Return PollingResult<String>") }
+        success { it == "READY" }
+        backoff(BackoffPolicies.quick20s)
+    }
+
+    fun runOnce() = viewModelScope.launch {
+        _status.value = PollingEngine.pollUntil(config).toString()
+    }
+}
+```
+
+iOS example (Swift calling Kotlin helper):
+
+```kotlin
+// shared Kotlin
+object IosAdapters {
+    fun provideStatusConfig(): PollingConfig<String> = pollingConfig {
+        fetch { TODO() }
+        success { it == "READY" }
+        backoff(BackoffPolicies.quick20s)
+    }
+}
+```
+
+```swift
+// Swift
+
+import PollingEngine
+
+let handle = InAndroidplayPollingengineAdaptersIosAdapters().startStatusPolling { outcome in
+    print("Outcome: \(outcome)")
+}
+```
+
+API Reference:
+
+- Generate locally with Dokka: `./gradlew :pollingengine:dokkaHtml`
+- Output is in `pollingengine/build/dokka/html/index.html`
+
+Platform‑specific notes:
+
+- expect/actual: Core engine lives in commonMain. If you introduce platform APIs, add expect
+  declarations in common and provide actual implementations in androidMain/iosMain.
+- Coroutines: library uses kotlinx.coroutines; ensure proper dispatchers on each platform.
+
+## Setup/Build Instructions
+
+Clone and build:
+
+```bash
+git clone https://github.com/bosankus/PollingEngine.git
+cd PollingEngine
+./gradlew build
+```
+
+Run tests (all targets where applicable):
+
+```bash
+./gradlew :pollingengine:allTests
+```
+
+Android app:
+
+```bash
+./gradlew :composeApp:installDebug
+```
+
+iOS builds (macOS):
+
+- Open iosApp in Xcode and run on a simulator.
+- If CoreSimulator issues arise, run `scripts/fix-ios-simulator.sh` then retry.
+
+## Publishing & Versioning
+
+Publishing to Maven Central uses com.vanniktech.maven.publish.
+
+- Required environment variables/Gradle properties (typically set in CI):
+    - OSSRH_USERNAME, OSSRH_PASSWORD
+    - SIGNING_KEY (Base64 GPG private key), SIGNING_PASSWORD
+    - GROUP: io.github.bosankus (already configured)
+- Commands:
+
+```bash
+./gradlew :pollingengine:publishToMavenLocal
+./gradlew :pollingengine:publish --no-configuration-cache
+```
+
+- See docs/ci-setup.md and docs/tasks.md for more details and suggested CI steps.
+
+Versioning policy: Semantic Versioning (MAJOR.MINOR.PATCH). Public API stability is guarded by
+Kotlin Binary Compatibility Validator.
+
+Release notes: maintain CHANGELOG.md for each version. Tag releases on Git and reference them in
+release notes.
+
+## Contributing
+
+We welcome contributions!
+
+- Fork the repo and create a feature branch
+- Follow Kotlin style and ktlint; run `./gradlew ktlintCheck detekt`
+- Ensure tests pass: `./gradlew build`
+- Open a Pull Request describing your changes
+
+Guidelines and policies:
+
+- [CONTRIBUTING.md](CONTRIBUTING.md)
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)
+- Binary compatibility: explicit API mode and API checks are enabled; please run
+  `./gradlew apiCheck` when modifying public APIs.
+
+## License
+
+Licensed under the Apache License, Version 2.0. See [LICENSE](LICENSE).
+
+Copyright (c) 2025 AndroidPlay
+
+## Maintainers & Support
+
+- Maintainer: @bosankus
+- Issues: use [GitHub Issues](https://github.com/bosankus/PollingEngine/issues)
+- Security: see [SECURITY.md](SECURITY.md)
