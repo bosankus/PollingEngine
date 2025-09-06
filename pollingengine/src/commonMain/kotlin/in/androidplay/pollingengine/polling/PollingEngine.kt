@@ -13,6 +13,8 @@ import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
@@ -30,11 +32,26 @@ import kotlin.time.TimeSource
  */
 public object PollingEngine {
 
+    public enum class State { Running, Paused }
+
+    private data class Control(
+        val id: String,
+        val state: kotlinx.coroutines.flow.MutableStateFlow<State> = kotlinx.coroutines.flow.MutableStateFlow(
+            State.Running
+        ),
+        val backoff: kotlinx.coroutines.flow.MutableStateFlow<BackoffPolicy?> = kotlinx.coroutines.flow.MutableStateFlow(
+            null
+        ),
+    )
+
     public data class Handle(public val id: String)
 
-    private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
+    private var supervisor: Job = SupervisorJob()
+    private var scope: CoroutineScope = CoroutineScope(supervisor + Dispatchers.Default)
     private val mutex = Mutex()
     private val active: MutableMap<String, Job> = mutableMapOf()
+    private val controls: MutableMap<String, Control> = mutableMapOf()
+    private var isShutdown: Boolean = false
 
     public fun activePollsCount(): Int = active.size
 
@@ -44,25 +61,82 @@ public object PollingEngine {
         mutex.withLock { active[id]?.cancel(CancellationException("Cancelled by user")) }
     }
 
+    public suspend fun pause(id: String) {
+        mutex.withLock { controls[id]?.state?.value = State.Paused }
+    }
+
+    public suspend fun resume(id: String) {
+        mutex.withLock { controls[id]?.state?.value = State.Running }
+    }
+
+    public suspend fun updateBackoff(id: String, newPolicy: BackoffPolicy) {
+        mutex.withLock { controls[id]?.backoff?.value = newPolicy }
+    }
+
     public suspend fun cancel(handle: Handle) {
         cancel(handle.id)
+    }
+
+    /** Cancels all active polls and clears the registry. */
+    public suspend fun cancelAll() {
+        val toCancel: List<Job> = mutex.withLock { active.values.toList() }
+        toCancel.forEach { it.cancel(CancellationException("Cancelled by user")) }
+        mutex.withLock { active.clear() }
+    }
+
+    /** Shuts down the engine: cancels all polls, cancels its scope, and prevents new polls from starting. */
+    public suspend fun shutdown() {
+        if (isShutdown) return
+        cancelAll()
+        mutex.withLock {
+            isShutdown = true
+        }
+        supervisor.cancel(CancellationException("PollingEngine shutdown"))
     }
 
     public fun <T> startPolling(
         config: PollingConfig<T>,
         onComplete: (PollingOutcome<T>) -> Unit,
     ): Handle {
+        if (isShutdown) throw IllegalStateException("PollingEngine is shut down")
         val id = generateId()
+        val control = Control(id)
         val job = scope.launch(config.dispatcher) {
-            val outcome = pollUntil(config)
+            val outcome = pollUntil(config, control)
             try {
                 onComplete(outcome)
             } finally {
-                mutex.withLock { active.remove(id) }
+                mutex.withLock {
+                    active.remove(id)
+                    controls.remove(id)
+                }
             }
         }
-        scope.launch { mutex.withLock { active[id] = job } }
+        scope.launch {
+            mutex.withLock {
+                active[id] = job
+                controls[id] = control
+            }
+        }
         return Handle(id)
+    }
+
+    /**
+     * Compose multiple polling operations sequentially. Stops early on non-success outcomes.
+     * Returns the last outcome (success from the last config or the first non-success).
+     */
+    public suspend fun <T> compose(vararg configs: PollingConfig<T>): PollingOutcome<T> {
+        var lastOutcome: PollingOutcome<T>? = null
+        for (cfg in configs) {
+            val control = Control(generateId())
+            val outcome = pollUntil(cfg, control)
+            lastOutcome = outcome
+            when (outcome) {
+                is PollingOutcome.Success -> continue
+                else -> return outcome
+            }
+        }
+        return lastOutcome ?: error("No configs provided")
     }
 
     private fun generateId(): String {
@@ -70,19 +144,30 @@ public object PollingEngine {
         return buildString(10) { repeat(10) { append(alphabet.random()) } }
     }
 
-    public suspend fun <T> pollUntil(config: PollingConfig<T>): PollingOutcome<T> = withContext(config.dispatcher) {
+    public suspend fun <T> pollUntil(config: PollingConfig<T>): PollingOutcome<T> =
+        pollUntil(config, Control(generateId()))
+
+    private suspend fun <T> pollUntil(
+        config: PollingConfig<T>,
+        control: Control
+    ): PollingOutcome<T> = withContext(config.dispatcher) {
         val startMark = TimeSource.Monotonic.markNow()
         var attempt = 0
         var nextDelay = config.backoff.initialDelayMs.coerceAtLeast(0L)
         var lastResult: PollingResult<T>? = null
 
         try {
-            while (attempt < config.backoff.maxAttempts) {
+            while (attempt < (control.backoff.value ?: config.backoff).maxAttempts) {
+                // Suspend while paused
+                if (control.state.value == State.Paused) {
+                    control.state.map { it == State.Running }.first { it }
+                }
                 ensureActive()
                 attempt++
 
+                val policy = control.backoff.value ?: config.backoff
                 val elapsedMs = startMark.elapsedNow().inWholeMilliseconds
-                val remainingOverall = config.backoff.overallTimeoutMs - elapsedMs
+                val remainingOverall = policy.overallTimeoutMs - elapsedMs
                 if (remainingOverall <= 0) {
                     @Suppress("UNCHECKED_CAST")
                     return@withContext PollingOutcome.Timeout(lastResult, attempt - 1, elapsedMs)
@@ -90,7 +175,7 @@ public object PollingEngine {
 
                 // Execute one attempt with per-attempt timeout if configured
                 val result: PollingResult<T> = try {
-                    val timeoutMs = config.backoff.perAttemptTimeoutMs
+                    val timeoutMs = policy.perAttemptTimeoutMs
                     if (timeoutMs != null) {
                         withTimeout(minOf(timeoutMs, remainingOverall)) {
                             // Preface only the first attempt immediately
@@ -159,23 +244,23 @@ public object PollingEngine {
                     }
                 }
 
-                // Compute jittered delay around current base
-                val base = nextDelay.coerceAtMost(config.backoff.maxDelayMs)
-                val sleepMs = config.backoff.computeJitteredDelay(base).coerceAtMost(config.backoff.maxDelayMs)
+                // Compute jittered delay around current base (use latest policy)
+                val base = nextDelay.coerceAtMost(policy.maxDelayMs)
+                val sleepMs = policy.computeJitteredDelay(base).coerceAtMost(policy.maxDelayMs)
 
-                // Increase delay for next cycle
-                val multiplied = (nextDelay.toDouble() * config.backoff.multiplier)
-                nextDelay = multiplied.toLong().coerceAtMost(config.backoff.maxDelayMs)
+                // Increase delay for next cycle using current policy
+                val multiplied = (nextDelay.toDouble() * policy.multiplier)
+                nextDelay = multiplied.toLong().coerceAtMost(policy.maxDelayMs)
 
                 // Respect overall timeout before sleeping
                 val elapsedBeforeSleep = startMark.elapsedNow().inWholeMilliseconds
-                val remainingBeforeSleep = config.backoff.overallTimeoutMs - elapsedBeforeSleep
+                val remainingBeforeSleep = policy.overallTimeoutMs - elapsedBeforeSleep
                 if (remainingBeforeSleep <= 0) break
 
                 // Provide the actual computed delay for the NEXT attempt's preface (attempt+1)
                 // Only announce if there is time left to sleep and another attempt could happen.
                 val nextAttemptIndex = attempt + 1
-                if (nextAttemptIndex <= config.backoff.maxAttempts) {
+                if (nextAttemptIndex <= policy.maxAttempts) {
                     config.metrics?.recordAttempt(nextAttemptIndex, sleepMs)
                     config.onAttempt(nextAttemptIndex, sleepMs)
                 }
@@ -184,7 +269,8 @@ public object PollingEngine {
             }
 
             val totalMs = startMark.elapsedNow().inWholeMilliseconds
-            val outcome = if (totalMs >= config.backoff.overallTimeoutMs) {
+            val outcome =
+                if (totalMs >= (control.backoff.value ?: config.backoff).overallTimeoutMs) {
                 PollingOutcome.Timeout(lastResult, attempt, totalMs)
             } else {
                 PollingOutcome.Exhausted(lastResult, attempt, totalMs)

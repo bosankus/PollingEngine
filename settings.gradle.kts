@@ -10,6 +10,7 @@ pluginManagement {
             }
         }
         mavenCentral()
+        mavenCentral()
         gradlePluginPortal()
     }
 }
@@ -23,9 +24,11 @@ dependencyResolutionManagement {
                 includeGroupAndSubgroups("com.google")
             }
         }
+        mavenLocal()
         mavenCentral()
     }
 }
 
 include(":composeApp")
 include(":pollingengine")
+include(":docs")

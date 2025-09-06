@@ -3,16 +3,16 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
     alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.dokka)
+    alias(libs.plugins.detekt)
+    alias(libs.plugins.ktlint)
+    alias(libs.plugins.vanniktechMavenPublish)
     kotlin("native.cocoapods")
-    id("org.jetbrains.dokka") version "1.9.20"
-    id("io.gitlab.arturbosch.detekt") version "1.23.6"
-    id("org.jlleitschuh.gradle.ktlint") version "12.1.1"
-    id("maven-publish")
     id("signing")
 }
 
-group = "in.androidplay"
-version = "0.1.0"
+group = "io.github.bosankus"
+version = libs.versions.pollingengine.get()
 description = "PollingEngine KMP library providing robust polling with backoff and jitter"
 
 kotlin {
@@ -20,17 +20,15 @@ kotlin {
 
     androidTarget {
         compilerOptions { jvmTarget.set(JvmTarget.JVM_11) }
-        publishLibraryVariants("release")
     }
 
     // CocoaPods configuration for iOS consumption
     cocoapods {
-        summary = "Robust polling engine with configurable backoff and jitter"
-        homepage = "https://github.com/androidplay/PollingEngine"
         ios.deploymentTarget = "14.0"
-        // Add extra spec attributes for license and authors
-        extraSpecAttributes["license"] = "{ :type => 'Apache-2.0', :file => 'LICENSE' }"
-        extraSpecAttributes["authors"] = "{ 'AndroidPlay' => 'opensource@androidplay.in' }"
+        summary = project.findProperty("pollingengine.summary") as String
+        homepage = project.findProperty("pollingengine.homepage") as String
+        extraSpecAttributes["license"] = project.findProperty("pollingengine.license") as String
+        extraSpecAttributes["authors"] = project.findProperty("pollingengine.authors") as String
 
         framework {
             baseName = "PollingEngine"
@@ -50,11 +48,11 @@ kotlin {
 
     sourceSets {
         commonMain.dependencies {
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.9.0")
+            implementation(libs.kotlinx.coroutines.core)
         }
         commonTest.dependencies {
             implementation(libs.kotlin.test)
-            implementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.9.0")
+            implementation(libs.kotlinx.coroutines.test)
         }
     }
 }
@@ -74,7 +72,7 @@ android {
     }
     buildTypes {
         release {
-            isMinifyEnabled = false
+            isMinifyEnabled = true
         }
     }
 }
@@ -92,32 +90,4 @@ ktlint {
     android.set(true)
 }
 
-publishing {
-    publications.withType<MavenPublication>().configureEach {
-        pom {
-            name.set("PollingEngine")
-            description.set(project.description)
-            url.set("https://github.com/androidplay/PollingEngine")
-            licenses {
-                license {
-                    name.set("Apache-2.0")
-                    url.set("https://www.apache.org/licenses/LICENSE-2.0.txt")
-                }
-            }
-            scm {
-                url.set("https://github.com/androidplay/PollingEngine")
-            }
-            developers {
-                developer {
-                    id.set("androidplay")
-                    name.set("AndroidPlay")
-                }
-            }
-        }
-    }
-}
-
-signing {
-    // No-op locally; configured via env/gradle.properties in CI
-    isRequired = false
-}
+apply(from = "publishing.gradle.kts")

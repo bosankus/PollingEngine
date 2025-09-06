@@ -44,9 +44,9 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import `in`.androidplay.pollingengine.models.PollingResult
 import `in`.androidplay.pollingengine.polling.BackoffPolicy
-import `in`.androidplay.pollingengine.polling.PollingConfig
 import `in`.androidplay.pollingengine.polling.PollingEngine
 import `in`.androidplay.pollingengine.polling.PollingOutcome
+import `in`.androidplay.pollingengine.polling.pollingConfig
 import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
 import kotlin.math.pow
@@ -81,8 +81,10 @@ private fun TerminalLog(modifier: Modifier = Modifier, logs: List<String>) {
                 verticalArrangement = Arrangement.spacedBy(8.dp),
                 contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp)
             ) {
-                items(logs) { line ->
-                    LogEntryCard(line)
+                items(items = logs, key = { it.hashCode() }) { line ->
+                    androidx.compose.animation.AnimatedVisibility(visible = true) {
+                        LogEntryCard(line = line)
+                    }
                 }
             }
         }
@@ -91,7 +93,7 @@ private fun TerminalLog(modifier: Modifier = Modifier, logs: List<String>) {
 
 // --- Simple log entry card without icons for multiplatform compatibility ---
 @Composable
-private fun LogEntryCard(line: String) {
+private fun LogEntryCard(line: String, modifier: Modifier = Modifier) {
     val (bgColor, textColor) = when {
         line.startsWith("[error]") -> Color(0x22FF5A5A) to Color(0xFFFFB4B4)
         line.startsWith("[done]") -> Color(0x2220E5A8) to Color(0xFFB2FFE5)
@@ -103,7 +105,7 @@ private fun LogEntryCard(line: String) {
         shadowElevation = 1.dp,
         color = bgColor,
         shape = androidx.compose.foundation.shape.RoundedCornerShape(6.dp),
-        modifier = Modifier.fillMaxWidth()
+        modifier = modifier.fillMaxWidth()
     ) {
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -306,6 +308,8 @@ fun App() {
     MaterialTheme(colorScheme = darkScheme, typography = techTypography) {
         val scope = rememberCoroutineScope()
         var isRunning by remember { mutableStateOf(false) }
+        var isPaused by remember { mutableStateOf(false) }
+        var handle by remember { mutableStateOf<PollingEngine.Handle?>(null) }
         val logs = remember { mutableStateListOf<String>() }
         var remainingMs by remember { mutableStateOf(0L) }
         var showProperties by remember { mutableStateOf(false) }
@@ -340,107 +344,131 @@ fun App() {
                 // Start button + countdown
                 Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                     GlowingButton(
-                        enabled = !isRunning,
-                        text = if (isRunning) "Running…" else "Start Polling",
+                        enabled = true,
+                        text = when {
+                            !isRunning -> "Start Polling"
+                            isPaused -> "Resume"
+                            else -> "Pause"
+                        },
                         onClick = {
-                            if (isRunning) return@GlowingButton
                             fun appendLog(msg: String) {
                                 scope.launch { logs.add(msg) }
                             }
-                            logs.clear()
+                            if (!isRunning) {
+                                logs.clear()
 
-                            // Parse and validate inputs
-                            val initialDelay = initialDelayText.toLongOrNull()
-                            val maxDelay = maxDelayText.toLongOrNull()
-                            val multiplier = multiplierText.toDoubleOrNull()
-                            val jitter = jitterText.toDoubleOrNull()
-                            val maxAttempts = maxAttemptsText.toIntOrNull()
-                            val overallTimeout = overallTimeoutText.toLongOrNull()
-                            val perAttemptTimeout =
-                                perAttemptTimeoutText.trim().ifEmpty { null }?.toLongOrNull()
+                                // Parse and validate inputs
+                                val initialDelay = initialDelayText.toLongOrNull()
+                                val maxDelay = maxDelayText.toLongOrNull()
+                                val multiplier = multiplierText.toDoubleOrNull()
+                                val jitter = jitterText.toDoubleOrNull()
+                                val maxAttempts = maxAttemptsText.toIntOrNull()
+                                val overallTimeout = overallTimeoutText.toLongOrNull()
+                                val perAttemptTimeout =
+                                    perAttemptTimeoutText.trim().ifEmpty { null }?.toLongOrNull()
 
-                            if (initialDelay == null || maxDelay == null || multiplier == null || jitter == null || maxAttempts == null || overallTimeout == null || (perAttemptTimeoutText.isNotEmpty() && perAttemptTimeout == null)) {
-                                appendLog("[error] Invalid properties. Please enter valid numbers.")
-                                return@GlowingButton
-                            }
+                                if (initialDelay == null || maxDelay == null || multiplier == null || jitter == null || maxAttempts == null || overallTimeout == null || (perAttemptTimeoutText.isNotEmpty() && perAttemptTimeout == null)) {
+                                    appendLog("[error] Invalid properties. Please enter valid numbers.")
+                                    return@GlowingButton
+                                }
 
-                            val backoff = try {
-                                BackoffPolicy(
-                                    initialDelayMs = initialDelay,
-                                    maxDelayMs = maxDelay,
-                                    multiplier = multiplier,
-                                    jitterRatio = jitter,
-                                    maxAttempts = maxAttempts,
-                                    overallTimeoutMs = overallTimeout,
-                                    perAttemptTimeoutMs = perAttemptTimeout,
-                                )
-                            } catch (t: Throwable) {
-                                appendLog("[error] ${t.message}")
-                                return@GlowingButton
-                            }
-
-                            isRunning = true
-                            remainingMs = backoff.overallTimeoutMs
-
-                            // Sample finish logic: succeed on the 8th attempt (to show exponential logs)
-                            var attemptCounter = 0
-
-                            val config = PollingConfig(
-                                fetch = {
-                                    attemptCounter++
-                                    if (attemptCounter < 8) {
-                                        PollingResult.Waiting
-                                    } else {
-                                        PollingResult.Success("Ready at attempt #$attemptCounter")
-                                    }
-                                },
-                                isTerminalSuccess = { value -> value.isNotEmpty() },
-                                backoff = backoff,
-                                onAttempt = { attempt, delayMs ->
-                                    // Calculate base (non-jittered) delay for this attempt
-                                    val baseDelay = (backoff.initialDelayMs *
-                                            backoff.multiplier.pow((attempt - 1).toDouble())
-                                            ).toLong().coerceAtMost(backoff.maxDelayMs)
-                                    val baseSecs = ((baseDelay) / 100L).toFloat() / 10f
-                                    val baseSecsStr =
-                                        ((kotlin.math.round(baseSecs * 10f)) / 10f).toString()
-
-                                    val actualDelay = delayMs ?: 0L
-                                    val actualSecs = (actualDelay / 100L).toFloat() / 10f
-                                    val actualSecsStr =
-                                        ((kotlin.math.round(actualSecs * 10f)) / 10f).toString()
-
-                                    appendLog("[info] Attempt #$attempt (base: ${baseSecsStr}s, actual: ${actualSecsStr}s)")
-                                },
-                                onResult = { attempt, result ->
-                                    appendLog("[info] Result at #$attempt: ${describeResult(result)}")
-                                },
-                                onComplete = { attempts, durationMs, outcome ->
-                                    val secs = (durationMs / 100L).toFloat() / 10f
-                                    val secsStr = ((kotlin.math.round(secs * 10f)) / 10f).toString()
-                                    appendLog(
-                                        "[done] Completed after $attempts attempts in ${secsStr}s: ${
-                                            describeOutcome(
-                                                outcome
-                                            )
-                                        }"
+                                val backoff = try {
+                                    BackoffPolicy(
+                                        initialDelayMs = initialDelay,
+                                        maxDelayMs = maxDelay,
+                                        multiplier = multiplier,
+                                        jitterRatio = jitter,
+                                        maxAttempts = maxAttempts,
+                                        overallTimeoutMs = overallTimeout,
+                                        perAttemptTimeoutMs = perAttemptTimeout,
                                     )
+                                } catch (t: Throwable) {
+                                    appendLog("[error] ${t.message}")
+                                    return@GlowingButton
                                 }
-                            )
 
-                            // Start countdown ticker
-                            scope.launch {
-                                while (isRunning && remainingMs > 0) {
-                                    kotlinx.coroutines.delay(100)
-                                    remainingMs = (remainingMs - 100).coerceAtLeast(0)
+                                isRunning = true
+                                isPaused = false
+                                remainingMs = backoff.overallTimeoutMs
+
+                                // Sample finish logic: succeed on the 8th attempt (to show exponential logs)
+                                var attemptCounter = 0
+
+                                val config = pollingConfig<String> {
+                                    fetch {
+                                        attemptCounter++
+                                        if (attemptCounter < 8) {
+                                            PollingResult.Waiting
+                                        } else {
+                                            PollingResult.Success("Ready at attempt #$attemptCounter")
+                                        }
+                                    }
+                                    success { value -> value.isNotEmpty() }
+                                    backoff(backoff)
+                                    onAttempt { attempt, delayMs ->
+                                        val baseDelay = (backoff.initialDelayMs *
+                                                backoff.multiplier.pow((attempt - 1).toDouble())
+                                                ).toLong().coerceAtMost(backoff.maxDelayMs)
+                                        val baseSecs = ((baseDelay) / 100L).toFloat() / 10f
+                                        val baseSecsStr =
+                                            ((kotlin.math.round(baseSecs * 10f)) / 10f).toString()
+                                        val actualDelay = delayMs ?: 0L
+                                        val actualSecs = (actualDelay / 100L).toFloat() / 10f
+                                        val actualSecsStr =
+                                            ((kotlin.math.round(actualSecs * 10f)) / 10f).toString()
+                                        appendLog("[info] Attempt #$attempt (base: ${baseSecsStr}s, actual: ${actualSecsStr}s)")
+                                    }
+                                    onResult { attempt, result ->
+                                        appendLog(
+                                            "[info] Result at #$attempt: ${
+                                                describeResult(
+                                                    result
+                                                )
+                                            }"
+                                        )
+                                    }
+                                    onComplete { attempts, durationMs, outcome ->
+                                        val secs = (durationMs / 100L).toFloat() / 10f
+                                        val secsStr =
+                                            ((kotlin.math.round(secs * 10f)) / 10f).toString()
+                                        appendLog(
+                                            "[done] Completed after $attempts attempts in ${secsStr}s: ${
+                                                describeOutcome(
+                                                    outcome
+                                                )
+                                            }"
+                                        )
+                                    }
                                 }
-                            }
 
-                            scope.launch {
-                                val outcome = PollingEngine.pollUntil(config)
-                                appendLog("[done] Final Outcome: ${describeOutcome(outcome)}")
-                                isRunning = false
-                                remainingMs = 0
+                                // Start countdown ticker respecting pause
+                                scope.launch {
+                                    while (isRunning && remainingMs > 0) {
+                                        kotlinx.coroutines.delay(100)
+                                        if (!isPaused) remainingMs =
+                                            (remainingMs - 100).coerceAtLeast(0)
+                                    }
+                                }
+
+                                // Start polling
+                                handle = PollingEngine.startPolling(config) { outcome ->
+                                    appendLog("[done] Final Outcome: ${describeOutcome(outcome)}")
+                                    isRunning = false
+                                    isPaused = false
+                                    remainingMs = 0
+                                    handle = null
+                                }
+                            } else {
+                                // Toggle pause/resume
+                                handle?.let {
+                                    if (isPaused) {
+                                        scope.launch { PollingEngine.resume(it.id) }
+                                        isPaused = false
+                                    } else {
+                                        scope.launch { PollingEngine.pause(it.id) }
+                                        isPaused = true
+                                    }
+                                }
                             }
                         }
                     )
@@ -448,9 +476,24 @@ fun App() {
                     val secs = (remainingMs / 100L).toFloat() / 10f
                     val secsStr = ((kotlin.math.round(secs * 10f)) / 10f).toString()
                     Text(
-                        text = if (isRunning) "${secsStr}s left" else "",
+                        text = if (isRunning) "${secsStr}s left" + if (isPaused) " (paused)" else "" else "",
                         color = MaterialTheme.colorScheme.onBackground,
                         fontWeight = FontWeight.Medium
+                    )
+
+                    // Stop button
+                    GlowingButton(
+                        enabled = isRunning,
+                        text = "Stop",
+                        onClick = {
+                            handle?.let { h ->
+                                scope.launch { PollingEngine.cancel(h) }
+                            }
+                            isRunning = false
+                            isPaused = false
+                            handle = null
+                            remainingMs = 0
+                        }
                     )
                 }
 
@@ -492,6 +535,53 @@ fun App() {
                         perAttemptTimeoutText = perAttemptTimeoutText,
                         onPerAttemptTimeoutChange = { perAttemptTimeoutText = it }
                     )
+                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                        GlowingButton(
+                            enabled = isRunning && handle != null,
+                            text = "Apply Backoff",
+                            onClick = {
+                                fun appendLog(msg: String) {
+                                    scope.launch { logs.add(msg) }
+                                }
+
+                                val initialDelay = initialDelayText.toLongOrNull()
+                                val maxDelay = maxDelayText.toLongOrNull()
+                                val multiplier = multiplierText.toDoubleOrNull()
+                                val jitter = jitterText.toDoubleOrNull()
+                                val maxAttempts = maxAttemptsText.toIntOrNull()
+                                val overallTimeout = overallTimeoutText.toLongOrNull()
+                                val perAttemptTimeout =
+                                    perAttemptTimeoutText.trim().ifEmpty { null }?.toLongOrNull()
+                                if (initialDelay == null || maxDelay == null || multiplier == null || jitter == null || maxAttempts == null || overallTimeout == null || (perAttemptTimeoutText.isNotEmpty() && perAttemptTimeout == null)) {
+                                    appendLog("[error] Invalid properties; cannot apply backoff.")
+                                    return@GlowingButton
+                                }
+                                val newPolicy = try {
+                                    BackoffPolicy(
+                                        initialDelayMs = initialDelay,
+                                        maxDelayMs = maxDelay,
+                                        multiplier = multiplier,
+                                        jitterRatio = jitter,
+                                        maxAttempts = maxAttempts,
+                                        overallTimeoutMs = overallTimeout,
+                                        perAttemptTimeoutMs = perAttemptTimeout,
+                                    )
+                                } catch (t: Throwable) {
+                                    appendLog("[error] ${t.message}")
+                                    return@GlowingButton
+                                }
+                                handle?.let { h ->
+                                    scope.launch {
+                                        PollingEngine.updateBackoff(
+                                            h.id,
+                                            newPolicy
+                                        )
+                                    }
+                                }
+                                appendLog("[info] Applied new backoff policy at runtime.")
+                            }
+                        )
+                    }
                 }
 
                 Spacer(Modifier.height(16.dp))
