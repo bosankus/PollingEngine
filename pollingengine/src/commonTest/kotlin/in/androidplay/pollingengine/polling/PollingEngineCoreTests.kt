@@ -56,7 +56,6 @@ class PollingEngineCoreTests {
 
         val outcome = Polling.run(config)
         assertTrue(outcome is PollingOutcome.Exhausted)
-        outcome
         assertTrue(outcome.last is Failure)
         assertEquals(1, outcome.attempts)
     }

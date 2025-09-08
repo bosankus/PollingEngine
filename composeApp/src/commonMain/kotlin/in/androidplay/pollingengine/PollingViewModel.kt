@@ -141,51 +141,93 @@ class PollingViewModel {
         }
 
         var attemptCounter = 0
-        pollingJob = Polling.startPolling {
-            this.fetch = {
-                attemptCounter++
-                if (attemptCounter < 8) PollingResult.Waiting else PollingResult.Success("Ready at attempt #$attemptCounter")
-            }
-            this.isTerminalSuccess = { it.isNotEmpty() }
-            this.backoff = backoff
-            this.shouldRetryOnError = retryStrategies[_uiState.value.retryStrategyIndex].second
-            this.onAttempt = { attempt, delayMs ->
-                val baseDelay =
-                    (backoff.initialDelayMs * backoff.multiplier.pow((attempt - 1).toDouble())).toLong()
-                        .coerceAtMost(backoff.maxDelayMs)
-                val baseSecs = ((baseDelay) / 100L).toFloat() / 10f
-                val baseSecsStr = ((round(baseSecs * 10f)) / 10f).toString()
-                val actualDelay = delayMs ?: 0L
-                val actualSecs = (actualDelay / 100L).toFloat() / 10f
-                val actualSecsStr = ((round(actualSecs * 10f)) / 10f).toString()
-                addLog("[info] Attempt #$attempt (base: ${baseSecsStr}s, actual: ${actualSecsStr}s)")
-            }
-            this.onResult = { attempt, result ->
-                addLog("[info] Result at #$attempt: ${describeResult(result)}")
-            }
-            this.onComplete = { attempts, durationMs, outcome ->
-                val secs = (durationMs / 100L).toFloat() / 10f
-                val secsStr = ((round(secs * 10f)) / 10f).toString()
-                addLog(
-                    "[done] Completed after $attempts attempts in ${secsStr}s: ${
-                        describeOutcome(
-                            outcome
-                        )
-                    }"
-                )
-            }
-        }.onEach { outcome ->
-            addLog("[done] Final Outcome: ${describeOutcome(outcome)}")
-            _uiState.update {
-                it.copy(
-                    isRunning = false,
-                    isPaused = false,
-                    remainingMs = 0
-                )
-            }
-        }.launchIn(viewModelScope)
 
-        startCountdown()
+        // Capture active IDs before starting, to identify the new session after launch
+        viewModelScope.launch {
+            try {
+                val beforeIds = Polling.listActiveIds().toSet()
+
+                // Start and collect the polling flow
+                pollingJob = Polling.startPolling<String> {
+                    this.fetch = {
+                        attemptCounter++
+                        if (attemptCounter < 8) PollingResult.Waiting else PollingResult.Success("Ready at attempt #$attemptCounter")
+                    }
+                    this.isTerminalSuccess = { it.isNotEmpty() }
+                    this.backoff = backoff
+                    this.shouldRetryOnError =
+                        retryStrategies[_uiState.value.retryStrategyIndex].second
+                    this.onAttempt = { attempt, delayMs ->
+                        val baseDelay =
+                            (backoff.initialDelayMs * backoff.multiplier.pow((attempt - 1).toDouble())).toLong()
+                                .coerceAtMost(backoff.maxDelayMs)
+                        val baseSecs = ((baseDelay) / 100L).toFloat() / 10f
+                        val baseSecsStr = ((round(baseSecs * 10f)) / 10f).toString()
+                        val actualDelay = delayMs ?: 0L
+                        val actualSecs = (actualDelay / 100L).toFloat() / 10f
+                        val actualSecsStr = ((round(actualSecs * 10f)) / 10f).toString()
+                        addLog("[info] Attempt #$attempt (base: ${baseSecsStr}s, actual: ${actualSecsStr}s)")
+                    }
+                    this.onResult = { attempt, result ->
+                        addLog("[info] Result at #$attempt: ${describeResult(result)}")
+                    }
+                    this.onComplete = { attempts, durationMs, outcome ->
+                        val secs = (durationMs / 100L).toFloat() / 10f
+                        val secsStr = ((round(secs * 10f)) / 10f).toString()
+                        addLog(
+                            "[done] Completed after $attempts attempts in ${secsStr}s: ${
+                                describeOutcome(
+                                    outcome
+                                )
+                            }"
+                        )
+                    }
+                }.onEach { outcome ->
+                    addLog("[done] Final Outcome: ${describeOutcome(outcome)}")
+                    _uiState.update {
+                        it.copy(
+                            isRunning = false,
+                            isPaused = false,
+                            remainingMs = 0
+                        )
+                    }
+                    // Clear session on terminal outcome
+                    pollingSession = null
+                }.launchIn(this)
+
+                // Try to resolve the newly created session ID with a short retry window
+                var resolved: String? = null
+                repeat(10) { // ~ up to 500ms (10 * 50ms)
+                    val afterIds = Polling.listActiveIds().toSet()
+                    val diff = afterIds - beforeIds
+                    if (diff.isNotEmpty()) {
+                        resolved = diff.first()
+                        return@repeat
+                    }
+                    kotlinx.coroutines.delay(50)
+                }
+
+                if (resolved != null) {
+                    pollingSession = PollingSession(resolved)
+                    addLog("[info] Session started (id=${resolved})")
+                } else {
+                    // Fallback: if exactly one active, take it
+                    val active = Polling.listActiveIds()
+                    if (active.size == 1) {
+                        pollingSession = PollingSession(active.first())
+                        addLog("[info] Session started (id=${active.first()})")
+                    } else {
+                        addLog("[error] Could not determine session id; pause/resume may not work.")
+                    }
+                }
+
+                // Start countdown after session likely established
+                startCountdown()
+            } catch (t: Throwable) {
+                addLog("[error] Failed to start polling: ${t.message}")
+                _uiState.update { it.copy(isRunning = false, isPaused = false) }
+            }
+        }
     }
 
     private fun pauseOrResumePolling() {

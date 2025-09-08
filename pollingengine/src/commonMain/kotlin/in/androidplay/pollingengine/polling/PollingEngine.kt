@@ -257,12 +257,19 @@ internal object PollingEngine {
                     config.onAttempt(nextAttemptIndex, sleepMs)
                 }
 
-                // Suspend while paused
-                if (control.state.value == State.Paused) {
-                    control.state.map { it == State.Running }.first { it }
+                // Wait for the required delay, pausing countdown if paused
+                var remainingDelay = minOf(sleepMs, remainingBeforeSleep)
+                val delayStep = 100L // ms granularity for checking pause/resume
+                while (remainingDelay > 0) {
+                    if (control.state.value == State.Paused) {
+                        // Wait until resumed
+                        control.state.map { it == State.Running }.first { it }
+                    } else {
+                        val step = minOf(delayStep, remainingDelay)
+                        delay(step)
+                        remainingDelay -= step
+                    }
                 }
-
-                delay(minOf(sleepMs, remainingBeforeSleep))
             }
 
             val totalMs = startMark.elapsedNow().inWholeMilliseconds
