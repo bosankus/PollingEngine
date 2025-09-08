@@ -4,7 +4,6 @@ package `in`.androidplay.pollingengine.polling
  * Factory Pattern: predefined BackoffPolicy configurations for common scenarios.
  */
 public object BackoffPolicies {
-
     /**
      * Quick polling tuned for short-lived availability (e.g., compliance status) with ~20s cap.
      */

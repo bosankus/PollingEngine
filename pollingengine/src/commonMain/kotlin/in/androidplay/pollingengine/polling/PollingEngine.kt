@@ -1,3 +1,4 @@
+
 package `in`.androidplay.pollingengine.polling
 
 import `in`.androidplay.pollingengine.models.PollingResult
@@ -11,8 +12,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
@@ -95,16 +99,16 @@ internal object PollingEngine {
     }
 
     fun <T> startPolling(
-        config: PollingConfig<T>,
-        onComplete: (PollingOutcome<T>) -> Unit,
-    ): Handle {
+        config: PollingConfig<T>
+    ): Flow<PollingOutcome<T>> = channelFlow {
         if (isShutdown) throw IllegalStateException("PollingEngine is shut down")
         val id = generateId()
         val control = Control(id)
         val job = scope.launch(config.dispatcher) {
             val outcome = pollUntil(config, control)
             try {
-                onComplete(outcome)
+                send(outcome)
+                close()
             } finally {
                 mutex.withLock {
                     active.remove(id)
@@ -112,13 +116,13 @@ internal object PollingEngine {
                 }
             }
         }
-        scope.launch {
-            mutex.withLock {
-                active[id] = job
-                controls[id] = control
-            }
+        mutex.withLock {
+            active[id] = job
+            controls[id] = control
         }
-        return Handle(id)
+        awaitClose {
+            job.cancel()
+        }
     }
 
     /**
@@ -158,10 +162,6 @@ internal object PollingEngine {
 
         try {
             while (attempt < (control.backoff.value ?: config.backoff).maxAttempts) {
-                // Suspend while paused
-                if (control.state.value == State.Paused) {
-                    control.state.map { it == State.Running }.first { it }
-                }
                 ensureActive()
                 attempt++
 
@@ -255,6 +255,11 @@ internal object PollingEngine {
                 val nextAttemptIndex = attempt + 1
                 if (nextAttemptIndex <= policy.maxAttempts) {
                     config.onAttempt(nextAttemptIndex, sleepMs)
+                }
+
+                // Suspend while paused
+                if (control.state.value == State.Paused) {
+                    control.state.map { it == State.Running }.first { it }
                 }
 
                 delay(minOf(sleepMs, remainingBeforeSleep))

@@ -1,5 +1,8 @@
 package `in`.androidplay.pollingengine.polling
 
+import `in`.androidplay.pollingengine.polling.builder.PollingConfigBuilder
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Public abstraction layer for consumers. Exposes a small, stable API surface.
  * Internals are delegated to the PollingEngine implementation.
@@ -34,9 +37,13 @@ public interface PollingApi {
 
     /** Start a new polling session. Returns a lightweight [PollingSession] handle. */
     public fun <T> startPolling(
-        config: PollingConfig<T>,
-        onComplete: (PollingOutcome<T>) -> Unit,
-    ): PollingSession
+        config: PollingConfig<T>
+    ): Flow<PollingOutcome<T>>
+
+    /** Start a new polling session. Returns a lightweight [PollingSession] handle. */
+    public fun <T> startPolling(
+        builder: PollingConfigBuilder<T>.() -> Unit
+    ): Flow<PollingOutcome<T>>
 
     /** One-shot polling that runs to completion synchronously (suspending). */
     public suspend fun <T> run(config: PollingConfig<T>): PollingOutcome<T>
@@ -44,4 +51,3 @@ public interface PollingApi {
     /** Compose multiple polling configs sequentially. */
     public suspend fun <T> compose(vararg configs: PollingConfig<T>): PollingOutcome<T>
 }
-

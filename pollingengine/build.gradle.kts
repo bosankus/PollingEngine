@@ -38,7 +38,7 @@ kotlin {
 
     listOf(
         iosArm64(),
-        iosSimulatorArm64()
+        iosSimulatorArm64(),
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "PollingEngine"
@@ -63,7 +63,9 @@ android {
 
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
-        consumerProguardFiles("consumer-rules.pro")
+        consumerProguardFiles(
+            "consumer-rules.pro",
+        )
     }
 
     compileOptions {

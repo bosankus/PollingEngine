@@ -28,13 +28,12 @@ class PollingEngineCoreTests {
                 jitterRatio = 0.0,
                 maxAttempts = 10,
                 overallTimeoutMs = 5_000,
-                random = Random(0)
+                random = Random(0),
             )
         )
 
         val outcome = Polling.run(config)
         assertTrue(outcome is PollingOutcome.Success)
-        outcome as PollingOutcome.Success
         assertEquals(100, outcome.value)
         assertEquals(3, outcome.attempts)
     }
@@ -51,7 +50,7 @@ class PollingEngineCoreTests {
                 multiplier = 1.0,
                 jitterRatio = 0.0,
                 maxAttempts = 5,
-                overallTimeoutMs = 5_000
+                overallTimeoutMs = 5_000,
             )
         )
 
@@ -78,12 +77,12 @@ class PollingEngineCoreTests {
                 multiplier = 1.0,
                 jitterRatio = 0.0,
                 maxAttempts = 3,
-                overallTimeoutMs = 5_000
+                overallTimeoutMs = 5_000,
             )
         )
         val outcome = Polling.run(config)
         assertTrue(outcome is PollingOutcome.Exhausted)
-        assertEquals(3, (outcome as PollingOutcome.Exhausted).attempts)
+        assertEquals(3, outcome.attempts)
     }
 
     @Test
@@ -138,6 +137,6 @@ class PollingEngineCoreTests {
         )
         val outcome = Polling.compose(cfg1, cfg2)
         assertTrue(outcome is PollingOutcome.Exhausted)
-        assertEquals(1, (outcome as PollingOutcome.Exhausted).attempts)
+        assertEquals(1, outcome.attempts)
     }
 }

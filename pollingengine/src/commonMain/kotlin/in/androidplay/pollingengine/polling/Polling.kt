@@ -1,5 +1,8 @@
 package `in`.androidplay.pollingengine.polling
 
+import `in`.androidplay.pollingengine.polling.builder.PollingConfigBuilder
+import kotlinx.coroutines.flow.Flow
+
 /**
  * Public facade instance for consumers. Delegates to the internal engine.
  *
@@ -20,10 +23,15 @@ public object Polling : PollingApi {
         PollingEngine.updateBackoff(id, newPolicy)
 
     override fun <T> startPolling(
-        config: PollingConfig<T>,
-        onComplete: (PollingOutcome<T>) -> Unit,
-    ): PollingSession =
-        PollingEngine.startPolling(config, onComplete).let { PollingSession(it.id) }
+        config: PollingConfig<T>
+    ): Flow<PollingOutcome<T>> = PollingEngine.startPolling(config)
+
+    override fun <T> startPolling(
+        builder: PollingConfigBuilder<T>.() -> Unit
+    ): Flow<PollingOutcome<T>> {
+        val config = PollingConfigBuilder<T>().apply(builder).build()
+        return startPolling(config)
+    }
 
     override suspend fun <T> run(config: PollingConfig<T>): PollingOutcome<T> =
         PollingEngine.pollUntil(config)
@@ -31,4 +39,3 @@ public object Polling : PollingApi {
     override suspend fun <T> compose(vararg configs: PollingConfig<T>): PollingOutcome<T> =
         PollingEngine.compose(*configs)
 }
-

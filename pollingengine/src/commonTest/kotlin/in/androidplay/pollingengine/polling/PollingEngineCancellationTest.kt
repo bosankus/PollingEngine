@@ -23,7 +23,7 @@ class PollingEngineCancellationTest {
                 maxAttempts = 1, // single attempt
                 overallTimeoutMs = 5_000,
                 perAttemptTimeoutMs = null,
-            )
+            ),
         )
 
         val outcome = Polling.run(config)

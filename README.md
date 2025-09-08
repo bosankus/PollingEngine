@@ -1,6 +1,6 @@
 # PollingEngine
 
-Last updated: 2025-09-07 02:33
+Last updated: 2025-09-08 17:36
 
 [![Maven Central](https://img.shields.io/maven-central/v/in.androidplay/pollingengine.svg?label=Maven%20Central)](https://central.sonatype.com/artifact/in.androidplay/pollingengine)
 ![Kotlin](https://img.shields.io/badge/Kotlin-2.2.10-blue?logo=kotlin)
@@ -51,7 +51,7 @@ Highlights:
 
 - Simple DSL with pollingConfig { … }
 - Backoff presets (e.g., BackoffPolicies.quick20s)
-- Control operations: pause(id), resume(id), cancel(handle/id), cancelAll(), shutdown()
+- Control operations: pause(id), resume(id), cancel(id), cancelAll(), shutdown()
 - Domain‑level results via PollingResult and terminal PollingOutcome
 
 ## Installation and Dependency
@@ -60,20 +60,20 @@ Coordinates on Maven Central:
 
 - groupId: in.androidplay
 - artifactId: pollingengine
-- version: 0.1.0
+- version: 0.1.1
 
 Gradle Kotlin DSL (Android/shared):
 
 ```kotlin
 repositories { mavenCentral() }
-dependencies { implementation("in.androidplay:pollingengine:0.1.0") }
+dependencies { implementation("in.androidplay:pollingengine:0.1.1") }
 ```
 
 Gradle Groovy DSL:
 
 ```groovy
 repositories { mavenCentral() }
-dependencies { implementation "in.androidplay:pollingengine:0.1.0" }
+dependencies { implementation "in.androidplay:pollingengine:0.1.1" }
 ```
 
 Maven:
@@ -83,7 +83,7 @@ Maven:
 <dependency>
   <groupId>in.androidplay</groupId>
     <artifactId>pollingengine</artifactId>
-    <version>0.1.0</version>
+  <version>0.1.1</version>
 </dependency>
 ```
 
@@ -261,24 +261,38 @@ Copyright (c) 2025 AndroidPlay
 
 ## Control APIs and Runtime Updates
 
-You can start background polling and control it via the Polling facade:
+Start polling by collecting the returned Flow, and control active sessions by ID:
 
 ```kotlin
-val handle = Polling.startPolling(config) { outcome ->
+// Start and collect in your scope
+val flow = Polling.startPolling(config)
+val job = flow.onEach { outcome ->
     println("Outcome: $outcome")
+}.launchIn(scope)
+
+// Introspection
+val ids = Polling.listActiveIds() // suspend; returns List<String>
+println("Active: $ids (count=${Polling.activePollsCount()})")
+
+// Pause/resume first active session (example)
+if (ids.isNotEmpty()) {
+  val id = ids.first()
+  Polling.pause(id)
+  // ... later
+  Polling.resume(id)
+
+  // Update backoff at runtime
+  Polling.updateBackoff(id, BackoffPolicies.quick20s)
+
+  // Cancel
+  Polling.cancel(id)
 }
 
-// Pause/resume a running session
-kotlinx.coroutines.GlobalScope.launch { Polling.pause(handle.id) }
-kotlinx.coroutines.GlobalScope.launch { Polling.resume(handle.id) }
+// Or cancel all
+Polling.cancelAll()
 
-// Update backoff policy at runtime
-kotlinx.coroutines.GlobalScope.launch {
-    Polling.updateBackoff(handle.id, BackoffPolicies.quick20s)
-}
-
-// Cancel by handle or by id
-kotlinx.coroutines.GlobalScope.launch { Polling.cancel(handle) }
+// Stop collecting if needed
+job.cancel()
 ```
 
 ## RetryPredicates examples
@@ -298,6 +312,5 @@ retry(RetryPredicates.never)
 
 ## More documentation
 
-See the full developer guide with more examples and API overview:
-
-- docs/PollingEngine.md
+- docs/pollingengine.md — Web Guide (overview, install, Android/iOS usage)
+- docs/DeveloperGuide.md — Developer Guide (API overview, DSL, migration, reference)
