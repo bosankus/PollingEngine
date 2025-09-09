@@ -2,7 +2,6 @@ package `in`.androidplay.pollingengine
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -17,7 +16,8 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
-import androidx.compose.foundation.text.selection.SelectionContainer
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.DividerDefaults
@@ -27,71 +27,21 @@ import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateListOf
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import `in`.androidplay.pollingengine.models.PollingResult
-import `in`.androidplay.pollingengine.polling.BackoffPolicy
-import `in`.androidplay.pollingengine.polling.PollingEngine
-import `in`.androidplay.pollingengine.polling.PollingOutcome
-import `in`.androidplay.pollingengine.polling.pollingConfig
-import kotlinx.coroutines.launch
 import org.jetbrains.compose.ui.tooling.preview.Preview
-import kotlin.math.pow
-
-// ------- Models and helpers (moved above App to avoid any potential local-declaration parsing issues) -------
+import kotlin.math.round
 
 
-@Composable
-private fun TerminalLog(modifier: Modifier = Modifier, logs: List<String>) {
-    val bg = Color(0xFF0F1115)
-    val border = Color(0xFF2A2F3A)
-
-    val listState = rememberLazyListState()
-
-    LaunchedEffect(logs.size) {
-        if (logs.isNotEmpty()) {
-            listState.animateScrollToItem(logs.lastIndex.coerceAtLeast(0))
-        }
-    }
-
-    Box(
-        modifier = modifier
-            .fillMaxWidth()
-            .clip(androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-            .background(bg)
-            .border(1.dp, border, androidx.compose.foundation.shape.RoundedCornerShape(8.dp))
-            .padding(12.dp)
-    ) {
-        SelectionContainer {
-            LazyColumn(
-                state = listState,
-                verticalArrangement = Arrangement.spacedBy(8.dp),
-                contentPadding = PaddingValues(top = 6.dp, bottom = 24.dp)
-            ) {
-                items(items = logs, key = { it.hashCode() }) { line ->
-                    androidx.compose.animation.AnimatedVisibility(visible = true) {
-                        LogEntryCard(line = line)
-                    }
-                }
-            }
-        }
-    }
-}
-
-// --- Simple log entry card without icons for multiplatform compatibility ---
 @Composable
 private fun LogEntryCard(line: String, modifier: Modifier = Modifier) {
     val (bgColor, textColor) = when {
@@ -124,117 +74,67 @@ private fun LogEntryCard(line: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-private fun PropertiesCard(
-    initialDelayText: String, onInitialChange: (String) -> Unit,
-    maxDelayText: String, onMaxDelayChange: (String) -> Unit,
-    multiplierText: String, onMultiplierChange: (String) -> Unit,
-    jitterText: String, onJitterChange: (String) -> Unit,
-    maxAttemptsText: String, onMaxAttemptsChange: (String) -> Unit,
-    overallTimeoutText: String, onOverallTimeoutChange: (String) -> Unit,
-    perAttemptTimeoutText: String, onPerAttemptTimeoutChange: (String) -> Unit,
+private fun LabeledField(
+    label: String,
+    value: String,
+    onValueChange: (String) -> Unit,
+    modifier: Modifier = Modifier,
+    placeholder: String? = null,
+    suffix: String? = null,
+    supportingText: String? = null,
+    isError: Boolean = false,
+    keyboardType: KeyboardType = KeyboardType.Text,
 ) {
-    Surface(
-        tonalElevation = 3.dp,
-        shadowElevation = 2.dp,
-        shape = androidx.compose.foundation.shape.RoundedCornerShape(14.dp),
-        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
-        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)),
-        modifier = Modifier
-            .fillMaxWidth()
-            .padding(bottom = 2.dp)
-    ) {
-        Column(
-            modifier = Modifier.padding(18.dp),
-            verticalArrangement = Arrangement.spacedBy(16.dp)
-        ) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(24.dp)
-            ) {
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
+    Column(modifier = modifier.fillMaxWidth()) {
+        OutlinedTextField(
+            value = value,
+            onValueChange = onValueChange,
+            singleLine = true,
+            label = { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant) },
+            placeholder = { if (placeholder != null) Text(placeholder) },
+            textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
+            trailingIcon = {
+                if (suffix != null) {
                     Text(
-                        "Delays & Attempts",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
-                    LabeledField("initialDelayMs", initialDelayText, onInitialChange)
-                    LabeledField("maxAttempts", maxAttemptsText, onMaxAttemptsChange)
-                    LabeledField(
-                        "perAttemptTimeoutMs",
-                        perAttemptTimeoutText,
-                        onPerAttemptTimeoutChange
+                        suffix,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        fontSize = 12.sp
                     )
                 }
-                Column(
-                    modifier = Modifier.weight(1f),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
-                ) {
-                    Text(
-                        "Backoff & Timeouts",
-                        style = MaterialTheme.typography.labelLarge,
-                        color = MaterialTheme.colorScheme.primary,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(bottom = 2.dp)
-                    )
-                    LabeledField("maxDelayMs", maxDelayText, onMaxDelayChange)
-                    LabeledField("multiplier", multiplierText, onMultiplierChange)
-                    LabeledField("jitterRatio", jitterText, onJitterChange)
-                    LabeledField("overallTimeoutMs", overallTimeoutText, onOverallTimeoutChange)
-                }
-            }
+            },
+            isError = isError,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            modifier = Modifier.fillMaxWidth()
+        )
+        if (supportingText != null) {
+            Text(
+                text = supportingText,
+                color = if (isError) Color(0xFFFF8A80) else MaterialTheme.colorScheme.onSurfaceVariant,
+                style = MaterialTheme.typography.labelSmall,
+                modifier = Modifier.padding(start = 12.dp, top = 4.dp)
+            )
         }
     }
 }
 
 @Composable
-private fun LabeledField(label: String, value: String, onValueChange: (String) -> Unit) {
-    OutlinedTextField(
-        value = value,
-        onValueChange = onValueChange,
-        singleLine = true,
-        label = { Text(label, color = MaterialTheme.colorScheme.onSurfaceVariant) },
-        textStyle = MaterialTheme.typography.bodyMedium.copy(color = MaterialTheme.colorScheme.onSurface),
-        modifier = Modifier.fillMaxWidth()
+private fun SectionHeader(title: String) {
+    Text(
+        text = title,
+        style = MaterialTheme.typography.labelLarge,
+        color = MaterialTheme.colorScheme.primary,
+        fontWeight = FontWeight.Bold,
+        modifier = Modifier.padding(bottom = 2.dp)
     )
 }
 
-private fun <T> describeResult(result: PollingResult<T>): String = when (result) {
-    is PollingResult.Success -> "Success(${result.data})"
-    is PollingResult.Failure -> "Failure(code=${result.error.code}, msg=${result.error.message})"
-    is PollingResult.Waiting -> "Waiting"
-    is PollingResult.Cancelled -> "Cancelled"
-    is PollingResult.Unknown -> "Unknown"
-}
-
-private fun <T> describeOutcome(outcome: PollingOutcome<T>): String = when (outcome) {
-    is PollingOutcome.Success -> {
-        val secs = (outcome.elapsedMs / 100L).toFloat() / 10f
-        "Success(value=${outcome.value}, attempts=${outcome.attempts}, elapsedSec=${
-            ((kotlin.math.round(
-                secs * 10f
-            )) / 10f)
-        })"
-    }
-
-    is PollingOutcome.Exhausted -> {
-        val secs = (outcome.elapsedMs / 100L).toFloat() / 10f
-        "Exhausted(attempts=${outcome.attempts}, elapsedSec=${((kotlin.math.round(secs * 10f)) / 10f)})"
-    }
-
-    is PollingOutcome.Timeout -> {
-        val secs = (outcome.elapsedMs / 100L).toFloat() / 10f
-        "Timeout(attempts=${outcome.attempts}, elapsedSec=${((kotlin.math.round(secs * 10f)) / 10f)})"
-    }
-
-    is PollingOutcome.Cancelled -> {
-        val secs = (outcome.elapsedMs / 100L).toFloat() / 10f
-        "Cancelled(attempts=${outcome.attempts}, elapsedSec=${((kotlin.math.round(secs * 10f)) / 10f)})"
-    }
+@Composable
+private fun SectionDivider() {
+    HorizontalDivider(
+        modifier = Modifier.padding(vertical = 12.dp),
+        thickness = 1.dp,
+        color = MaterialTheme.colorScheme.outline.copy(alpha = 0.5f)
+    )
 }
 
 @Composable
@@ -259,27 +159,63 @@ private fun GlowingButton(
     }
 }
 
-private fun buildTechTypography(
-    base: androidx.compose.material3.Typography,
-    family: FontFamily
-): androidx.compose.material3.Typography {
-    return androidx.compose.material3.Typography(
-        displayLarge = base.displayLarge.copy(fontFamily = family),
-        displayMedium = base.displayMedium.copy(fontFamily = family),
-        displaySmall = base.displaySmall.copy(fontFamily = family),
-        headlineLarge = base.headlineLarge.copy(fontFamily = family),
-        headlineMedium = base.headlineMedium.copy(fontFamily = family),
-        headlineSmall = base.headlineSmall.copy(fontFamily = family),
-        titleLarge = base.titleLarge.copy(fontFamily = family),
-        titleMedium = base.titleMedium.copy(fontFamily = family),
-        titleSmall = base.titleSmall.copy(fontFamily = family),
-        bodyLarge = base.bodyLarge.copy(fontFamily = family),
-        bodyMedium = base.bodyMedium.copy(fontFamily = family),
-        bodySmall = base.bodySmall.copy(fontFamily = family),
-        labelLarge = base.labelLarge.copy(fontFamily = family),
-        labelMedium = base.labelMedium.copy(fontFamily = family),
-        labelSmall = base.labelSmall.copy(fontFamily = family),
-    )
+@Composable
+private fun ControlPanel(
+    isRunning: Boolean,
+    isPaused: Boolean,
+    remainingMs: Long,
+    onStart: () -> Unit,
+    onPause: () -> Unit,
+    onStop: () -> Unit
+) {
+    val secs = (remainingMs / 100L).toFloat() / 10f
+    val secsStr = ((round(secs * 10f)) / 10f).toString()
+    Surface(
+        tonalElevation = 3.dp,
+        shadowElevation = 2.dp,
+        shape = RoundedCornerShape(14.dp),
+        color = MaterialTheme.colorScheme.surfaceVariant.copy(alpha = 0.92f),
+        border = BorderStroke(
+            1.dp,
+            MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+        ),
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(bottom = 2.dp)
+    ) {
+        Column(
+            modifier = Modifier.padding(18.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            Text(
+                text = if (isRunning) "${secsStr}s left" + if (isPaused) " (paused)" else "" else "Not running",
+                color = MaterialTheme.colorScheme.onBackground,
+                fontWeight = FontWeight.Medium,
+                style = MaterialTheme.typography.titleLarge
+            )
+            if (isRunning) {
+                Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                    GlowingButton(
+                        enabled = true,
+                        text = if (isPaused) "Resume" else "Pause",
+                        onClick = onPause
+                    )
+                    GlowingButton(
+                        enabled = true,
+                        text = "Stop",
+                        onClick = onStop
+                    )
+                }
+            } else {
+                GlowingButton(
+                    enabled = true,
+                    text = "Start Polling",
+                    onClick = onStart
+                )
+            }
+        }
+    }
 }
 
 // ------- Main App -------
@@ -287,307 +223,257 @@ private fun buildTechTypography(
 @Composable
 @Preview
 fun App() {
-    // Global advanced dark theme with custom typography
-    val neonPrimary = Color(0xFF00E5A8)
-    val bg = Color(0xFF0B1015)
-    val onBg = Color(0xFFE6F1FF)
-    val darkScheme = androidx.compose.material3.darkColorScheme(
-        primary = neonPrimary,
-        onPrimary = Color(0xFF00110A),
-        background = bg,
-        onBackground = onBg,
-        surface = Color(0xFF111823),
-        onSurface = onBg,
-        surfaceVariant = Color(0xFF172232),
-        onSurfaceVariant = Color(0xFFB7C4D6),
-        outline = Color(0xFF334155),
+    val viewModel = remember { PollingViewModel() }
+    val uiState by viewModel.uiState.collectAsState()
+    val listState = rememberLazyListState()
+
+    val retryStrategies = listOf(
+        "Always",
+        "Never",
+        "Any timeout"
     )
-    val baseTypography = androidx.compose.material3.Typography()
-    val techTypography = buildTechTypography(baseTypography, FontFamily.SansSerif)
 
-    MaterialTheme(colorScheme = darkScheme, typography = techTypography) {
-        val scope = rememberCoroutineScope()
-        var isRunning by remember { mutableStateOf(false) }
-        var isPaused by remember { mutableStateOf(false) }
-        var handle by remember { mutableStateOf<PollingEngine.Handle?>(null) }
-        val logs = remember { mutableStateListOf<String>() }
-        var remainingMs by remember { mutableStateOf(0L) }
-        var showProperties by remember { mutableStateOf(false) }
-
-        // Editable property state (as text for easy input/validation)
-        var initialDelayText by remember { mutableStateOf("500") }
-        var maxDelayText by remember { mutableStateOf("5000") }
-        var multiplierText by remember { mutableStateOf("1.8") }
-        var jitterText by remember { mutableStateOf("0.15") }
-        var maxAttemptsText by remember { mutableStateOf("12") }
-        var overallTimeoutText by remember { mutableStateOf("30000") }
-        var perAttemptTimeoutText by remember { mutableStateOf("") } // empty = null
-
+    PollingEngineTheme {
         Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
-            Column(
-                modifier = Modifier
-                    .padding(16.dp)
-                    .fillMaxSize(),
-                horizontalAlignment = Alignment.Start,
-                verticalArrangement = Arrangement.Top
+            LazyColumn(
+                state = listState,
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(horizontal = 24.dp, vertical = 16.dp)
             ) {
-                Spacer(Modifier.height(40.dp))
-                // Heading
-                Text(
-                    text = "Polling Terminal",
-                    style = MaterialTheme.typography.headlineSmall,
-                    fontWeight = FontWeight.Bold,
-                    color = MaterialTheme.colorScheme.onBackground
-                )
-                Spacer(Modifier.height(12.dp))
+                item {
+                    Column(
+                        horizontalAlignment = Alignment.Start,
+                        verticalArrangement = Arrangement.Top
+                    ) {
+                        Spacer(Modifier.height(40.dp))
+                        // Heading
+                        Text(
+                            text = "Polling Terminal",
+                            style = MaterialTheme.typography.headlineSmall,
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onBackground
+                        )
+                        Spacer(Modifier.height(12.dp))
 
-                // Start button + countdown
-                Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                    GlowingButton(
-                        enabled = true,
-                        text = when {
-                            !isRunning -> "Start Polling"
-                            isPaused -> "Resume"
-                            else -> "Pause"
-                        },
-                        onClick = {
-                            fun appendLog(msg: String) {
-                                scope.launch { logs.add(msg) }
-                            }
-                            if (!isRunning) {
-                                logs.clear()
+                        ControlPanel(
+                            isRunning = uiState.isRunning,
+                            isPaused = uiState.isPaused,
+                            remainingMs = uiState.remainingMs,
+                            onStart = { viewModel.dispatch(PollingIntent.StartPolling) },
+                            onPause = { viewModel.dispatch(PollingIntent.PauseOrResumePolling) },
+                            onStop = { viewModel.dispatch(PollingIntent.StopPolling) }
+                        )
 
-                                // Parse and validate inputs
-                                val initialDelay = initialDelayText.toLongOrNull()
-                                val maxDelay = maxDelayText.toLongOrNull()
-                                val multiplier = multiplierText.toDoubleOrNull()
-                                val jitter = jitterText.toDoubleOrNull()
-                                val maxAttempts = maxAttemptsText.toIntOrNull()
-                                val overallTimeout = overallTimeoutText.toLongOrNull()
-                                val perAttemptTimeout =
-                                    perAttemptTimeoutText.trim().ifEmpty { null }?.toLongOrNull()
+                        Spacer(Modifier.height(24.dp))
 
-                                if (initialDelay == null || maxDelay == null || multiplier == null || jitter == null || maxAttempts == null || overallTimeout == null || (perAttemptTimeoutText.isNotEmpty() && perAttemptTimeout == null)) {
-                                    appendLog("[error] Invalid properties. Please enter valid numbers.")
-                                    return@GlowingButton
-                                }
-
-                                val backoff = try {
-                                    BackoffPolicy(
-                                        initialDelayMs = initialDelay,
-                                        maxDelayMs = maxDelay,
-                                        multiplier = multiplier,
-                                        jitterRatio = jitter,
-                                        maxAttempts = maxAttempts,
-                                        overallTimeoutMs = overallTimeout,
-                                        perAttemptTimeoutMs = perAttemptTimeout,
+                        // Editable Properties panel (not in logs)
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clickable { viewModel.dispatch(PollingIntent.ToggleProperties) },
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Column(Modifier.weight(1f)) {
+                                Text(
+                                    (if (uiState.showProperties) "▼ " else "▶ ") + "Basic Setup",
+                                    style = MaterialTheme.typography.titleMedium,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = MaterialTheme.colorScheme.onBackground
+                                )
+                                if (uiState.showProperties) {
+                                    Text(
+                                        "Configure delays, timeouts and retry strategy.",
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = MaterialTheme.colorScheme.onSurfaceVariant
                                     )
-                                } catch (t: Throwable) {
-                                    appendLog("[error] ${t.message}")
-                                    return@GlowingButton
                                 }
+                            }
+                        }
+                        if (uiState.showProperties) {
+                            HorizontalDivider(
+                                Modifier.padding(vertical = 12.dp),
+                                DividerDefaults.Thickness,
+                                MaterialTheme.colorScheme.outline
+                            )
+                            Surface(
+                                tonalElevation = 3.dp,
+                                shadowElevation = 2.dp,
+                                shape = RoundedCornerShape(14.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                    alpha = 0.92f
+                                ),
+                                border = BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.7f)
+                                ),
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 2.dp)
+                            ) {
+                                Column(
+                                    modifier = Modifier.padding(18.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
+                                ) {
+                                    SectionHeader("Delays & Backoff")
+                                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                        LabeledField(
+                                            "Initial",
+                                            uiState.initialDelayText,
+                                            { viewModel.dispatch(PollingIntent.UpdateInitialDelay(it)) },
+                                            modifier = Modifier.weight(1f),
+                                            placeholder = "e.g. 500",
+                                            suffix = "ms",
+                                            keyboardType = KeyboardType.Number
+                                        )
+                                        LabeledField(
+                                            "Max",
+                                            uiState.maxDelayText,
+                                            { viewModel.dispatch(PollingIntent.UpdateMaxDelay(it)) },
+                                            modifier = Modifier.weight(1f),
+                                            placeholder = "e.g. 5000",
+                                            suffix = "ms",
+                                            keyboardType = KeyboardType.Number
+                                        )
+                                    }
+                                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                        LabeledField(
+                                            "Multiplier",
+                                            uiState.multiplierText,
+                                            { viewModel.dispatch(PollingIntent.UpdateMultiplier(it)) },
+                                            modifier = Modifier.weight(1f),
+                                            placeholder = "e.g. 1.8",
+                                            keyboardType = KeyboardType.Decimal
+                                        )
+                                        LabeledField(
+                                            "Jitter",
+                                            uiState.jitterText,
+                                            { viewModel.dispatch(PollingIntent.UpdateJitter(it)) },
+                                            modifier = Modifier.weight(1f),
+                                            placeholder = "e.g. 0.15",
+                                            keyboardType = KeyboardType.Decimal
+                                        )
+                                    }
 
-                                isRunning = true
-                                isPaused = false
-                                remainingMs = backoff.overallTimeoutMs
+                                    SectionDivider()
+                                    SectionHeader("Timeouts & Attempts")
+                                    Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                                        LabeledField(
+                                            "Max Attempts",
+                                            uiState.maxAttemptsText,
+                                            { viewModel.dispatch(PollingIntent.UpdateMaxAttempts(it)) },
+                                            modifier = Modifier.weight(1f),
+                                            placeholder = "e.g. 12",
+                                            keyboardType = KeyboardType.Number
+                                        )
+                                        LabeledField(
+                                            "Overall",
+                                            uiState.overallTimeoutText,
+                                            {
+                                                viewModel.dispatch(
+                                                    PollingIntent.UpdateOverallTimeout(
+                                                        it
+                                                    )
+                                                )
+                                            },
+                                            modifier = Modifier.weight(1f),
+                                            placeholder = "e.g. 30000",
+                                            suffix = "ms",
+                                            keyboardType = KeyboardType.Number
+                                        )
+                                    }
+                                    LabeledField(
+                                        "Per-attempt",
+                                        uiState.perAttemptTimeoutText,
+                                        {
+                                            viewModel.dispatch(
+                                                PollingIntent.UpdatePerAttemptTimeout(
+                                                    it
+                                                )
+                                            )
+                                        },
+                                        placeholder = "empty = unlimited",
+                                        suffix = "ms",
+                                        keyboardType = KeyboardType.Number
+                                    )
 
-                                // Sample finish logic: succeed on the 8th attempt (to show exponential logs)
-                                var attemptCounter = 0
+                                    // Live update button
+                                    GlowingButton(
+                                        enabled = uiState.isRunning,
+                                        text = "Apply Backoff at Runtime",
+                                        onClick = { viewModel.dispatch(PollingIntent.ApplyBackoffAtRuntime) }
+                                    )
+                                }
+                            }
 
-                                val config = pollingConfig<String> {
-                                    fetch {
-                                        attemptCounter++
-                                        if (attemptCounter < 8) {
-                                            PollingResult.Waiting
-                                        } else {
-                                            PollingResult.Success("Ready at attempt #$attemptCounter")
+                            Spacer(Modifier.height(16.dp))
+
+                            // Retry Strategy inside Basic setup
+                            Surface(
+                                tonalElevation = 2.dp,
+                                shadowElevation = 1.dp,
+                                shape = RoundedCornerShape(10.dp),
+                                color = MaterialTheme.colorScheme.surfaceVariant.copy(
+                                    alpha = 0.7f
+                                ),
+                                border = BorderStroke(
+                                    1.dp,
+                                    MaterialTheme.colorScheme.outline.copy(alpha = 0.6f)
+                                ),
+                                modifier = Modifier.fillMaxWidth()
+                            ) {
+                                Column(Modifier.padding(16.dp)) {
+                                    Text(
+                                        "Retry Strategy",
+                                        style = MaterialTheme.typography.labelLarge,
+                                        color = MaterialTheme.colorScheme.primary,
+                                        fontWeight = FontWeight.Bold,
+                                    )
+                                    Spacer(Modifier.height(12.dp))
+                                    Row(
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                        modifier = Modifier.fillMaxWidth()
+                                    ) {
+                                        retryStrategies.forEachIndexed { idx, label ->
+                                            val selected = uiState.retryStrategyIndex == idx
+                                            Button(
+                                                onClick = {
+                                                    viewModel.dispatch(
+                                                        PollingIntent.UpdateRetryStrategy(
+                                                            idx
+                                                        )
+                                                    )
+                                                },
+                                                enabled = true,
+                                                shape = RoundedCornerShape(8.dp),
+                                                border = BorderStroke(
+                                                    1.dp,
+                                                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                                                ),
+                                                colors = ButtonDefaults.buttonColors(
+                                                    containerColor = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant,
+                                                    contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                                                )
+                                            ) {
+                                                Text(
+                                                    label,
+                                                    fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal
+                                                )
+                                            }
                                         }
                                     }
-                                    success { value -> value.isNotEmpty() }
-                                    backoff(backoff)
-                                    onAttempt { attempt, delayMs ->
-                                        val baseDelay = (backoff.initialDelayMs *
-                                                backoff.multiplier.pow((attempt - 1).toDouble())
-                                                ).toLong().coerceAtMost(backoff.maxDelayMs)
-                                        val baseSecs = ((baseDelay) / 100L).toFloat() / 10f
-                                        val baseSecsStr =
-                                            ((kotlin.math.round(baseSecs * 10f)) / 10f).toString()
-                                        val actualDelay = delayMs ?: 0L
-                                        val actualSecs = (actualDelay / 100L).toFloat() / 10f
-                                        val actualSecsStr =
-                                            ((kotlin.math.round(actualSecs * 10f)) / 10f).toString()
-                                        appendLog("[info] Attempt #$attempt (base: ${baseSecsStr}s, actual: ${actualSecsStr}s)")
-                                    }
-                                    onResult { attempt, result ->
-                                        appendLog(
-                                            "[info] Result at #$attempt: ${
-                                                describeResult(
-                                                    result
-                                                )
-                                            }"
-                                        )
-                                    }
-                                    onComplete { attempts, durationMs, outcome ->
-                                        val secs = (durationMs / 100L).toFloat() / 10f
-                                        val secsStr =
-                                            ((kotlin.math.round(secs * 10f)) / 10f).toString()
-                                        appendLog(
-                                            "[done] Completed after $attempts attempts in ${secsStr}s: ${
-                                                describeOutcome(
-                                                    outcome
-                                                )
-                                            }"
-                                        )
-                                    }
-                                }
-
-                                // Start countdown ticker respecting pause
-                                scope.launch {
-                                    while (isRunning && remainingMs > 0) {
-                                        kotlinx.coroutines.delay(100)
-                                        if (!isPaused) remainingMs =
-                                            (remainingMs - 100).coerceAtLeast(0)
-                                    }
-                                }
-
-                                // Start polling
-                                handle = PollingEngine.startPolling(config) { outcome ->
-                                    appendLog("[done] Final Outcome: ${describeOutcome(outcome)}")
-                                    isRunning = false
-                                    isPaused = false
-                                    remainingMs = 0
-                                    handle = null
-                                }
-                            } else {
-                                // Toggle pause/resume
-                                handle?.let {
-                                    if (isPaused) {
-                                        scope.launch { PollingEngine.resume(it.id) }
-                                        isPaused = false
-                                    } else {
-                                        scope.launch { PollingEngine.pause(it.id) }
-                                        isPaused = true
-                                    }
                                 }
                             }
                         }
-                    )
-                    Spacer(Modifier.weight(1f))
-                    val secs = (remainingMs / 100L).toFloat() / 10f
-                    val secsStr = ((kotlin.math.round(secs * 10f)) / 10f).toString()
-                    Text(
-                        text = if (isRunning) "${secsStr}s left" + if (isPaused) " (paused)" else "" else "",
-                        color = MaterialTheme.colorScheme.onBackground,
-                        fontWeight = FontWeight.Medium
-                    )
-
-                    // Stop button
-                    GlowingButton(
-                        enabled = isRunning,
-                        text = "Stop",
-                        onClick = {
-                            handle?.let { h ->
-                                scope.launch { PollingEngine.cancel(h) }
-                            }
-                            isRunning = false
-                            isPaused = false
-                            handle = null
-                            remainingMs = 0
-                        }
-                    )
-                }
-
-                Spacer(Modifier.height(16.dp))
-
-                // Editable Properties panel (not in logs)
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { showProperties = !showProperties },
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Text(
-                        (if (showProperties) "▼ " else "▶ ") + "Properties",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.SemiBold,
-                        color = MaterialTheme.colorScheme.onBackground
-                    )
-                }
-                if (showProperties) {
-                    HorizontalDivider(
-                        Modifier.padding(vertical = 6.dp),
-                        DividerDefaults.Thickness, MaterialTheme.colorScheme.outline
-                    )
-                    PropertiesCard(
-                        initialDelayText = initialDelayText,
-                        onInitialChange = { initialDelayText = it },
-                        maxDelayText = maxDelayText,
-                        onMaxDelayChange = { maxDelayText = it },
-                        multiplierText = multiplierText,
-                        onMultiplierChange = { multiplierText = it },
-                        jitterText = jitterText,
-                        onJitterChange = { jitterText = it },
-                        maxAttemptsText = maxAttemptsText,
-                        onMaxAttemptsChange = { maxAttemptsText = it },
-                        overallTimeoutText = overallTimeoutText,
-                        onOverallTimeoutChange = { overallTimeoutText = it },
-                        perAttemptTimeoutText = perAttemptTimeoutText,
-                        onPerAttemptTimeoutChange = { perAttemptTimeoutText = it }
-                    )
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        GlowingButton(
-                            enabled = isRunning && handle != null,
-                            text = "Apply Backoff",
-                            onClick = {
-                                fun appendLog(msg: String) {
-                                    scope.launch { logs.add(msg) }
-                                }
-
-                                val initialDelay = initialDelayText.toLongOrNull()
-                                val maxDelay = maxDelayText.toLongOrNull()
-                                val multiplier = multiplierText.toDoubleOrNull()
-                                val jitter = jitterText.toDoubleOrNull()
-                                val maxAttempts = maxAttemptsText.toIntOrNull()
-                                val overallTimeout = overallTimeoutText.toLongOrNull()
-                                val perAttemptTimeout =
-                                    perAttemptTimeoutText.trim().ifEmpty { null }?.toLongOrNull()
-                                if (initialDelay == null || maxDelay == null || multiplier == null || jitter == null || maxAttempts == null || overallTimeout == null || (perAttemptTimeoutText.isNotEmpty() && perAttemptTimeout == null)) {
-                                    appendLog("[error] Invalid properties; cannot apply backoff.")
-                                    return@GlowingButton
-                                }
-                                val newPolicy = try {
-                                    BackoffPolicy(
-                                        initialDelayMs = initialDelay,
-                                        maxDelayMs = maxDelay,
-                                        multiplier = multiplier,
-                                        jitterRatio = jitter,
-                                        maxAttempts = maxAttempts,
-                                        overallTimeoutMs = overallTimeout,
-                                        perAttemptTimeoutMs = perAttemptTimeout,
-                                    )
-                                } catch (t: Throwable) {
-                                    appendLog("[error] ${t.message}")
-                                    return@GlowingButton
-                                }
-                                handle?.let { h ->
-                                    scope.launch {
-                                        PollingEngine.updateBackoff(
-                                            h.id,
-                                            newPolicy
-                                        )
-                                    }
-                                }
-                                appendLog("[info] Applied new backoff policy at runtime.")
-                            }
-                        )
                     }
                 }
-
-                Spacer(Modifier.height(16.dp))
-
-                // Terminal Log view
-                TerminalLog(modifier = Modifier.weight(1f), logs = logs)
+                item {
+                    Spacer(Modifier.height(24.dp))
+                }
+                items(items = uiState.logs, key = { it.id }) { line ->
+                    LogEntryCard(line = line.text)
+                }
             }
         }
     }

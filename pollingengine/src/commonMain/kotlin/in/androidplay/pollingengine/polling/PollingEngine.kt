@@ -1,3 +1,4 @@
+
 package `in`.androidplay.pollingengine.polling
 
 import `in`.androidplay.pollingengine.models.PollingResult
@@ -11,8 +12,11 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
+import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.isActive
@@ -28,11 +32,11 @@ import kotlin.time.TimeSource
  * - Coroutine-friendly, supports cancellation.
  * - Robust handling for rogue CancellationException (treat as retryable error if scope is still active).
  * - Configurable via [PollingConfig] and [BackoffPolicy].
- * - Observability hooks and metrics (optional).
+ * - Observability hooks (attempt/result/complete).
  */
-public object PollingEngine {
+internal object PollingEngine {
 
-    public enum class State { Running, Paused }
+    internal enum class State { Running, Paused }
 
     private data class Control(
         val id: String,
@@ -44,7 +48,7 @@ public object PollingEngine {
         ),
     )
 
-    public data class Handle(public val id: String)
+    internal data class Handle(internal val id: String)
 
     private var supervisor: Job = SupervisorJob()
     private var scope: CoroutineScope = CoroutineScope(supervisor + Dispatchers.Default)
@@ -53,39 +57,39 @@ public object PollingEngine {
     private val controls: MutableMap<String, Control> = mutableMapOf()
     private var isShutdown: Boolean = false
 
-    public fun activePollsCount(): Int = active.size
+    fun activePollsCount(): Int = active.size
 
-    public suspend fun listActiveIds(): List<String> = mutex.withLock { active.keys.toList() }
+    suspend fun listActiveIds(): List<String> = mutex.withLock { active.keys.toList() }
 
-    public suspend fun cancel(id: String) {
+    suspend fun cancel(id: String) {
         mutex.withLock { active[id]?.cancel(CancellationException("Cancelled by user")) }
     }
 
-    public suspend fun pause(id: String) {
+    suspend fun pause(id: String) {
         mutex.withLock { controls[id]?.state?.value = State.Paused }
     }
 
-    public suspend fun resume(id: String) {
+    suspend fun resume(id: String) {
         mutex.withLock { controls[id]?.state?.value = State.Running }
     }
 
-    public suspend fun updateBackoff(id: String, newPolicy: BackoffPolicy) {
+    suspend fun updateBackoff(id: String, newPolicy: BackoffPolicy) {
         mutex.withLock { controls[id]?.backoff?.value = newPolicy }
     }
 
-    public suspend fun cancel(handle: Handle) {
+    suspend fun cancel(handle: Handle) {
         cancel(handle.id)
     }
 
     /** Cancels all active polls and clears the registry. */
-    public suspend fun cancelAll() {
+    suspend fun cancelAll() {
         val toCancel: List<Job> = mutex.withLock { active.values.toList() }
         toCancel.forEach { it.cancel(CancellationException("Cancelled by user")) }
         mutex.withLock { active.clear() }
     }
 
     /** Shuts down the engine: cancels all polls, cancels its scope, and prevents new polls from starting. */
-    public suspend fun shutdown() {
+    suspend fun shutdown() {
         if (isShutdown) return
         cancelAll()
         mutex.withLock {
@@ -94,17 +98,17 @@ public object PollingEngine {
         supervisor.cancel(CancellationException("PollingEngine shutdown"))
     }
 
-    public fun <T> startPolling(
-        config: PollingConfig<T>,
-        onComplete: (PollingOutcome<T>) -> Unit,
-    ): Handle {
+    fun <T> startPolling(
+        config: PollingConfig<T>
+    ): Flow<PollingOutcome<T>> = channelFlow {
         if (isShutdown) throw IllegalStateException("PollingEngine is shut down")
         val id = generateId()
         val control = Control(id)
         val job = scope.launch(config.dispatcher) {
             val outcome = pollUntil(config, control)
             try {
-                onComplete(outcome)
+                send(outcome)
+                close()
             } finally {
                 mutex.withLock {
                     active.remove(id)
@@ -112,20 +116,20 @@ public object PollingEngine {
                 }
             }
         }
-        scope.launch {
-            mutex.withLock {
-                active[id] = job
-                controls[id] = control
-            }
+        mutex.withLock {
+            active[id] = job
+            controls[id] = control
         }
-        return Handle(id)
+        awaitClose {
+            job.cancel()
+        }
     }
 
     /**
      * Compose multiple polling operations sequentially. Stops early on non-success outcomes.
      * Returns the last outcome (success from the last config or the first non-success).
      */
-    public suspend fun <T> compose(vararg configs: PollingConfig<T>): PollingOutcome<T> {
+    suspend fun <T> compose(vararg configs: PollingConfig<T>): PollingOutcome<T> {
         var lastOutcome: PollingOutcome<T>? = null
         for (cfg in configs) {
             val control = Control(generateId())
@@ -144,7 +148,7 @@ public object PollingEngine {
         return buildString(10) { repeat(10) { append(alphabet.random()) } }
     }
 
-    public suspend fun <T> pollUntil(config: PollingConfig<T>): PollingOutcome<T> =
+    internal suspend fun <T> pollUntil(config: PollingConfig<T>): PollingOutcome<T> =
         pollUntil(config, Control(generateId()))
 
     private suspend fun <T> pollUntil(
@@ -158,10 +162,6 @@ public object PollingEngine {
 
         try {
             while (attempt < (control.backoff.value ?: config.backoff).maxAttempts) {
-                // Suspend while paused
-                if (control.state.value == State.Paused) {
-                    control.state.map { it == State.Running }.first { it }
-                }
                 ensureActive()
                 attempt++
 
@@ -180,7 +180,6 @@ public object PollingEngine {
                         withTimeout(minOf(timeoutMs, remainingOverall)) {
                             // Preface only the first attempt immediately
                             if (attempt == 1) {
-                                config.metrics?.recordAttempt(attempt, 0)
                                 config.onAttempt(attempt, 0)
                             }
                             config.fetch()
@@ -188,7 +187,6 @@ public object PollingEngine {
                     } else {
                         // Preface only the first attempt immediately
                         if (attempt == 1) {
-                            config.metrics?.recordAttempt(attempt, 0)
                             config.onAttempt(attempt, 0)
                         }
                         config.fetch()
@@ -201,7 +199,6 @@ public object PollingEngine {
                     Failure(config.throwableMapper(t))
                 }
 
-                config.metrics?.recordResult(attempt, result)
                 config.onResult(attempt, result)
                 lastResult = result
 
@@ -211,7 +208,6 @@ public object PollingEngine {
                         if (config.isTerminalSuccess(v)) {
                             val totalMs = startMark.elapsedNow().inWholeMilliseconds
                             val outcome = PollingOutcome.Success(v, attempt, totalMs)
-                            config.metrics?.recordComplete(attempt, totalMs)
                             config.onComplete(attempt, totalMs, outcome)
                             return@withContext outcome
                         }
@@ -223,8 +219,6 @@ public object PollingEngine {
                             val totalMs = startMark.elapsedNow().inWholeMilliseconds
                             val outcome = PollingOutcome.Exhausted(result, attempt, totalMs)
                             @Suppress("UNCHECKED_CAST")
-                            config.metrics?.recordComplete(attempt, totalMs)
-                            @Suppress("UNCHECKED_CAST")
                             config.onComplete(attempt, totalMs, outcome as PollingOutcome<T>)
                             @Suppress("UNCHECKED_CAST")
                             return@withContext (outcome as PollingOutcome<T>)
@@ -234,7 +228,6 @@ public object PollingEngine {
                     is Cancelled -> {
                         val totalMs = startMark.elapsedNow().inWholeMilliseconds
                         val outcome = PollingOutcome.Cancelled(attempt, totalMs)
-                        config.metrics?.recordComplete(attempt, totalMs)
                         config.onComplete(attempt, totalMs, outcome)
                         return@withContext outcome
                     }
@@ -261,11 +254,22 @@ public object PollingEngine {
                 // Only announce if there is time left to sleep and another attempt could happen.
                 val nextAttemptIndex = attempt + 1
                 if (nextAttemptIndex <= policy.maxAttempts) {
-                    config.metrics?.recordAttempt(nextAttemptIndex, sleepMs)
                     config.onAttempt(nextAttemptIndex, sleepMs)
                 }
 
-                delay(minOf(sleepMs, remainingBeforeSleep))
+                // Wait for the required delay, pausing countdown if paused
+                var remainingDelay = minOf(sleepMs, remainingBeforeSleep)
+                val delayStep = 100L // ms granularity for checking pause/resume
+                while (remainingDelay > 0) {
+                    if (control.state.value == State.Paused) {
+                        // Wait until resumed
+                        control.state.map { it == State.Running }.first { it }
+                    } else {
+                        val step = minOf(delayStep, remainingDelay)
+                        delay(step)
+                        remainingDelay -= step
+                    }
+                }
             }
 
             val totalMs = startMark.elapsedNow().inWholeMilliseconds
@@ -275,7 +279,6 @@ public object PollingEngine {
             } else {
                 PollingOutcome.Exhausted(lastResult, attempt, totalMs)
             }
-            config.metrics?.recordComplete(attempt, totalMs)
             config.onComplete(attempt, totalMs, outcome)
             outcome
         } finally {

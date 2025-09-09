@@ -11,7 +11,7 @@ plugins {
     id("signing")
 }
 
-group = "io.github.bosankus"
+group = "in.androidplay"
 version = libs.versions.pollingengine.get()
 description = "PollingEngine KMP library providing robust polling with backoff and jitter"
 
@@ -38,7 +38,7 @@ kotlin {
 
     listOf(
         iosArm64(),
-        iosSimulatorArm64()
+        iosSimulatorArm64(),
     ).forEach { iosTarget ->
         iosTarget.binaries.framework {
             baseName = "PollingEngine"
@@ -63,7 +63,9 @@ android {
 
     defaultConfig {
         minSdk = libs.versions.android.minSdk.get().toInt()
-        consumerProguardFiles("consumer-rules.pro")
+        consumerProguardFiles(
+            "consumer-rules.pro",
+        )
     }
 
     compileOptions {
