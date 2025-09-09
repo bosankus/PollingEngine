@@ -111,75 +111,168 @@ cd iosApp && pod install
 - Swift Package Manager: If you publish an XCFramework, add the package URL and version in Xcode. (
   SPM publication is not configured in this repo out‑of‑the‑box.)
 
-## Usage
+## Android Implementation
 
-Basic shared usage:
+On Android, you'll typically use the polling engine within a ViewModel and expose the results to
+your UI using StateFlow.
 
+**ViewModel Example:**
 ```kotlin
+class PollingViewModel : ViewModel() {
 
-val config = pollingConfig<String> {
-    fetch { /* return PollingResult<String> */ TODO() }
-    success { it == "READY" }
-    // Retry for common transient errors (network/server/timeout/unknown)
-    retry(RetryPredicates.networkOrServerOrTimeout)
-    backoff(BackoffPolicies.quick20s)
+  private val _uiState = MutableStateFlow<PollingUiState>(PollingUiState.Idle)
+  val uiState: StateFlow<PollingUiState> = _uiState.asStateFlow()
+
+  private var pollingSession: PollingSession? = null
+
+  fun startPolling() {
+    viewModelScope.launch {
+      _uiState.value = PollingUiState.Loading
+
+      val pollingFlow = Polling.startPolling<String> {
+        fetch = {
+          // Your network call or other async operation
+          // e.g., api.checkJobStatus()
+          // Return PollingResult.Success, PollingResult.Failure, or PollingResult.Waiting
+        }
+        isTerminalSuccess = { it.equals("COMPLETED", ignoreCase = true) }
+        backoff = BackoffPolicy(
+          initialDelayMs = 1000,
+          maxDelayMs = 10000,
+          multiplier = 1.5,
+          maxAttempts = 10
+        )
+        shouldRetryOnError = RetryPredicates.networkOrServerOrTimeout
+      }
+
+      // Get the session ID
+      pollingSession = Polling.listActiveIds().firstOrNull()?.let { PollingSession(it) }
+
+      pollingFlow.collect { outcome ->
+        when (outcome) {
+          is PollingOutcome.Success -> _uiState.value = PollingUiState.Success(outcome.value)
+          is PollingOutcome.Exhausted -> _uiState.value =
+            PollingUiState.Error("Polling exhausted after ${outcome.attempts} attempts.")
+          is PollingOutcome.Timeout -> _uiState.value = PollingUiState.Error("Polling timed out.")
+          is PollingOutcome.Cancelled -> _uiState.value = PollingUiState.Idle
+        }
+      }
+    }
+  }
+
+  fun cancelPolling() {
+    pollingSession?.let {
+      viewModelScope.launch {
+        Polling.cancel(it.id)
+      }
+    }
+  }
+
+  override fun onCleared() {
+    super.onCleared()
+    cancelPolling()
+  }
 }
 
-suspend fun run(): PollingOutcome<String> = Polling.run(config)
+sealed class PollingUiState {
+  object Idle : PollingUiState()
+  object Loading : PollingUiState()
+  data class Success(val data: String) : PollingUiState()
+  data class Error(val message: String) : PollingUiState()
+}
 ```
 
-Android example (ViewModel + Compose):
+**Lifecycle Management:**
+It's crucial to cancel the polling operation when the ViewModel is cleared to avoid memory leaks.
+The `onCleared()` method is the perfect place for this.
 
+## iOS (Swift) Implementation
+
+For iOS, you can use a helper class in your shared Kotlin module to expose the polling functionality
+to Swift.
+
+**Shared Kotlin Helper:**
 ```kotlin
-class StatusViewModel : ViewModel() {
-    private val _status = MutableStateFlow("Idle")
-    val status: StateFlow<String> = _status
-
-    private val config = pollingConfig<String> {
-        fetch { TODO("Return PollingResult<String>") }
-        success { it == "READY" }
-        backoff(BackoffPolicies.quick20s)
-    }
-
-    fun runOnce() = viewModelScope.launch {
-        _status.value = Polling.run(config).toString()
+// In your shared module (e.g., in a file named IosPollingHelper.kt)
+object IosPollingHelper {
+  fun startStatusPolling(
+    onUpdate: (String) -> Unit,
+    onComplete: (PollingOutcome<String>) -> Unit
+  ): Job {
+    val scope = CoroutineScope(Dispatchers.Main)
+    return Polling.startPolling<String> {
+      fetch = {
+        // Your fetch logic here
+      }
+      isTerminalSuccess = { it.equals("COMPLETED", ignoreCase = true) }
+      backoff = BackoffPolicies.quick20s
+      onAttempt = { attempt, _ ->
+        onUpdate("Polling attempt: $attempt")
+      }
+    }.onEach { outcome ->
+      onComplete(outcome)
+    }.launchIn(scope)
     }
 }
 ```
 
-iOS example (Swift calling Kotlin helper):
-
-```kotlin
-// shared Kotlin
-object IosAdapters {
-    fun provideStatusConfig(): PollingConfig<String> = pollingConfig {
-        fetch { TODO() }
-        success { it == "READY" }
-        backoff(BackoffPolicies.quick20s)
-    }
-}
-```
+**SwiftUI ViewModel:**
 
 ```swift
-// Swift
+import SwiftUI
+import pollingengine // Your KMP module name
 
-import PollingEngine
+@MainActor
+class PollingViewModel: ObservableObject {
+  @Published var status: String = "Idle"
+  private var pollingJob: Kotlinx_coroutines_coreJob?
 
-let handle = InAndroidplayPollingengineAdaptersIosAdapters().startStatusPolling { outcome in
-    print("Outcome: \(outcome)")
+  func startPolling() {
+    status = "Polling started..."
+    pollingJob = IosPollingHelper.shared.startStatusPolling(
+            onUpdate: { [weak self] updateMessage in
+              self?.status = updateMessage
+            },
+            onComplete: { [weak self] outcome in
+              if let success = outcome as? PollingOutcome.Success<NSString> {
+                self?.status = "Success: \(success.value)"
+              } else if let exhausted = outcome as? PollingOutcome.Exhausted {
+                self?.status = "Polling exhausted after \(exhausted.attempts) attempts."
+              } else if outcome is PollingOutcome.Timeout {
+                self?.status = "Polling timed out."
+              } else if outcome is PollingOutcome.Cancelled {
+                self?.status = "Polling cancelled."
+              }
+            }
+    )
+  }
+
+  func cancelPolling() {
+    pollingJob?.cancel(cause: nil)
+    status = "Idle"
+    }
 }
 ```
 
-API Reference:
+**SwiftUI View:**
+```swift
+struct ContentView: View {
+  @StateObject private var viewModel = PollingViewModel()
 
-- Generate locally with Dokka: `./gradlew :pollingengine:dokkaHtml`
-- Output is in `pollingengine/build/dokka/html/index.html`
-
-Platform‑specific notes:
-
-- expect/actual: Core engine lives in commonMain. If you introduce platform APIs, add expect
-  declarations in common and provide actual implementations in androidMain/iosMain.
-- Coroutines: library uses kotlinx.coroutines; ensure proper dispatchers on each platform.
+  var body: some View {
+    VStack {
+      Text(viewModel.status)
+          .padding()
+      Button("Start Polling") {
+        viewModel.startPolling()
+      }
+      Button("Cancel Polling") {
+        viewModel.cancelPolling()
+      }
+    }
+  }
+}
+```
 
 ## Setup/Build Instructions
 
@@ -258,59 +351,3 @@ Copyright (c) 2025 AndroidPlay
 - Maintainer: @bosankus
 - Issues: use [GitHub Issues](https://github.com/bosankus/PollingEngine/issues)
 - Security: see [SECURITY.md](SECURITY.md)
-
-## Control APIs and Runtime Updates
-
-Start polling by collecting the returned Flow, and control active sessions by ID:
-
-```kotlin
-// Start and collect in your scope
-val flow = Polling.startPolling(config)
-val job = flow.onEach { outcome ->
-    println("Outcome: $outcome")
-}.launchIn(scope)
-
-// Introspection
-val ids = Polling.listActiveIds() // suspend; returns List<String>
-println("Active: $ids (count=${Polling.activePollsCount()})")
-
-// Pause/resume first active session (example)
-if (ids.isNotEmpty()) {
-  val id = ids.first()
-  Polling.pause(id)
-  // ... later
-  Polling.resume(id)
-
-  // Update backoff at runtime
-  Polling.updateBackoff(id, BackoffPolicies.quick20s)
-
-  // Cancel
-  Polling.cancel(id)
-}
-
-// Or cancel all
-Polling.cancelAll()
-
-// Stop collecting if needed
-job.cancel()
-```
-
-## RetryPredicates examples
-
-Built-ins to reduce boilerplate:
-
-```kotlin
-// Retry for network/server/timeout/unknown errors (recommended)
-retry(RetryPredicates.networkOrServerOrTimeout)
-
-// Always retry on failures
-retry(RetryPredicates.always)
-
-// Never retry on failures
-retry(RetryPredicates.never)
-```
-
-## More documentation
-
-- docs/pollingengine.md — Web Guide (overview, install, Android/iOS usage)
-- docs/DeveloperGuide.md — Developer Guide (API overview, DSL, migration, reference)
