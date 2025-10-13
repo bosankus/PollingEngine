@@ -23,13 +23,13 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
           cache: 'gradle'
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: 'java-kotlin'
       # Custom build steps for Kotlin Multiplatform (avoid Android/iOS toolchains)
       - name: Build Kotlin common metadata
         run: ./gradlew :pollingengine:compileKotlinMetadata --no-daemon --stacktrace
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
 
   analyze-swift:
     name: Analyze (Swift)
@@ -40,10 +40,10 @@ jobs:
       security-events: write
     steps:
       - uses: actions/checkout@v5
-      - uses: github/codeql-action/init@v3
+      - uses: github/codeql-action/init@v4
         with:
           languages: 'swift'
       # Custom build steps for Swift (explicit xcodebuild)
       - name: Build iOS app for simulator (no code signing)
         run: xcodebuild -project iosApp/iosApp.xcodeproj -scheme iosApp -sdk iphonesimulator -configuration Release CODE_SIGNING_ALLOWED=NO build
-      - uses: github/codeql-action/analyze@v3
+      - uses: github/codeql-action/analyze@v4
