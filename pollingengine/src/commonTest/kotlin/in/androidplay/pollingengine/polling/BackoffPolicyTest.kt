@@ -44,10 +44,11 @@ class BackoffPolicyTest {
     @Test
     fun unlimitedSentinels_areAcceptedAndFlagged() {
         // F1: maxAttempts = 0 and overallTimeoutMs = 0 are now valid "unlimited" sentinels.
-        val unlimited = BackoffPolicy(
-            maxAttempts = BackoffPolicy.UNLIMITED_ATTEMPTS,
-            overallTimeoutMs = BackoffPolicy.NO_TIMEOUT,
-        )
+        val unlimited =
+            BackoffPolicy(
+                maxAttempts = BackoffPolicy.UNLIMITED_ATTEMPTS,
+                overallTimeoutMs = BackoffPolicy.NO_TIMEOUT,
+            )
         assertTrue(unlimited.isAttemptsUnlimited)
         assertTrue(unlimited.isOverallTimeoutDisabled)
 
@@ -60,13 +61,14 @@ class BackoffPolicyTest {
     fun jitteredDelay_withinExpectedBounds() {
         val base = 1_000L
         val jitter = 0.2
-        val policy = BackoffPolicy(
-            initialDelayMs = base,
-            maxDelayMs = 10_000,
-            multiplier = 2.0,
-            jitterRatio = jitter,
-            random = Random(0),
-        )
+        val policy =
+            BackoffPolicy(
+                initialDelayMs = base,
+                maxDelayMs = 10_000,
+                multiplier = 2.0,
+                jitterRatio = jitter,
+                random = Random(0),
+            )
         val minBound = (base * (1 - jitter)).toLong()
         val maxBound = (base * (1 + jitter)).toLong()
         repeat(100) {

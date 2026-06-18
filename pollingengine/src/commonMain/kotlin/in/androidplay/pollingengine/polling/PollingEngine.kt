@@ -48,17 +48,18 @@ import kotlin.time.TimeSource
  *   ([observe]) and multiplexed, subscriber-driven sessions ([shared]).
  */
 internal object PollingEngine {
-
     internal enum class State { Running, Paused }
 
     internal data class Control(
         val id: String,
-        val state: kotlinx.coroutines.flow.MutableStateFlow<State> = kotlinx.coroutines.flow.MutableStateFlow(
-            State.Running
-        ),
-        val backoff: kotlinx.coroutines.flow.MutableStateFlow<BackoffPolicy?> = kotlinx.coroutines.flow.MutableStateFlow(
-            null
-        ),
+        val state: kotlinx.coroutines.flow.MutableStateFlow<State> =
+            kotlinx.coroutines.flow.MutableStateFlow(
+                State.Running,
+            ),
+        val backoff: kotlinx.coroutines.flow.MutableStateFlow<BackoffPolicy?> =
+            kotlinx.coroutines.flow.MutableStateFlow(
+                null,
+            ),
     )
 
     /**
@@ -76,10 +77,21 @@ internal object PollingEngine {
         val isActive: Boolean get() = job.isActive
         val isPaused: Boolean get() = control.state.value == State.Paused
 
-        fun pause() { control.state.value = State.Paused }
-        fun resume() { control.state.value = State.Running }
-        fun cancel() { job.cancel(CancellationException("Cancelled by user")) }
-        fun retune(policy: BackoffPolicy) { control.backoff.value = policy }
+        fun pause() {
+            control.state.value = State.Paused
+        }
+
+        fun resume() {
+            control.state.value = State.Running
+        }
+
+        fun cancel() {
+            job.cancel(CancellationException("Cancelled by user"))
+        }
+
+        fun retune(policy: BackoffPolicy) {
+            control.backoff.value = policy
+        }
     }
 
     private var supervisor: Job = SupervisorJob()
@@ -128,27 +140,28 @@ internal object PollingEngine {
         val id = generateId()
         val control = Control(id)
         val deferred = CompletableDeferred<PollingOutcome<T>>()
-        val job = scope.launch(config.dispatcher) {
-            try {
-                mutex.withLock {
-                    active[id] = coroutineContext.job
-                    controls[id] = control
-                }
-                val outcome = runLoop(config, control) { value -> onValue?.invoke(value) }
-                deferred.complete(outcome)
-            } catch (ce: CancellationException) {
-                deferred.cancel(ce)
-                throw ce
-            } catch (t: Throwable) {
-                deferred.completeExceptionally(t)
-                throw t
-            } finally {
-                mutex.withLock {
-                    active.remove(id)
-                    controls.remove(id)
+        val job =
+            scope.launch(config.dispatcher) {
+                try {
+                    mutex.withLock {
+                        active[id] = coroutineContext.job
+                        controls[id] = control
+                    }
+                    val outcome = runLoop(config, control) { value -> onValue?.invoke(value) }
+                    deferred.complete(outcome)
+                } catch (ce: CancellationException) {
+                    deferred.cancel(ce)
+                    throw ce
+                } catch (t: Throwable) {
+                    deferred.completeExceptionally(t)
+                    throw t
+                } finally {
+                    mutex.withLock {
+                        active.remove(id)
+                        controls.remove(id)
+                    }
                 }
             }
-        }
         val outcomes: Flow<PollingOutcome<T>> = flow { emit(deferred.await()) }
         return EngineSession(id, job, control, outcomes)
     }
@@ -160,11 +173,12 @@ internal object PollingEngine {
      * or [PollingResult.Cancelled]); per-tick retryable errors are surfaced via the config hooks and
      * skipped. Pairs naturally with an unbounded [BackoffPolicy] (see [BackoffPolicies.fixed]).
      */
-    fun <T> observe(config: PollingConfig<T>): Flow<T> = channelFlow {
-        if (isShutdown) throw IllegalStateException("PollingEngine is shut down")
-        val control = Control(generateId())
-        runLoop(config, control) { value -> send(value) }
-    }
+    fun <T> observe(config: PollingConfig<T>): Flow<T> =
+        channelFlow {
+            if (isShutdown) throw IllegalStateException("PollingEngine is shut down")
+            val control = Control(generateId())
+            runLoop(config, control) { value -> send(value) }
+        }
 
     /**
      * Multiplexed, subscriber-driven session keyed by [key]. The same [key] returns the same live
@@ -222,12 +236,11 @@ internal object PollingEngine {
         sharedSessions.clear()
     }
 
-    internal suspend fun <T> pollUntil(config: PollingConfig<T>): PollingOutcome<T> =
-        pollUntil(config, Control(generateId()))
+    internal suspend fun <T> pollUntil(config: PollingConfig<T>): PollingOutcome<T> = pollUntil(config, Control(generateId()))
 
     private suspend fun <T> pollUntil(
         config: PollingConfig<T>,
-        control: Control
+        control: Control,
     ): PollingOutcome<T> = runLoop(config, control) { /* converge mode: values are not streamed */ }
 
     /**
@@ -242,146 +255,148 @@ internal object PollingEngine {
         config: PollingConfig<T>,
         control: Control,
         emit: suspend (T) -> Unit,
-    ): PollingOutcome<T> = withContext(config.dispatcher) {
-        val startMark = TimeSource.Monotonic.markNow()
-        var attempt = 0
-        var nextDelay = config.backoff.initialDelayMs.coerceAtLeast(0L)
-        var lastResult: PollingResult<T>? = null
+    ): PollingOutcome<T> =
+        withContext(config.dispatcher) {
+            val startMark = TimeSource.Monotonic.markNow()
+            var attempt = 0
+            var nextDelay = config.backoff.initialDelayMs.coerceAtLeast(0L)
+            var lastResult: PollingResult<T>? = null
 
-        while (true) {
-            ensureActive()
-            val policy = control.backoff.value ?: config.backoff
+            while (true) {
+                ensureActive()
+                val policy = control.backoff.value ?: config.backoff
 
-            // Attempt-limit check (skipped when unlimited)
-            if (!policy.isAttemptsUnlimited && attempt >= policy.maxAttempts) break
-            attempt++
+                // Attempt-limit check (skipped when unlimited)
+                if (!policy.isAttemptsUnlimited && attempt >= policy.maxAttempts) break
+                attempt++
 
-            val elapsedMs = startMark.elapsedNow().inWholeMilliseconds
-            val remainingOverall =
-                if (policy.isOverallTimeoutDisabled) Long.MAX_VALUE else policy.overallTimeoutMs - elapsedMs
-            if (!policy.isOverallTimeoutDisabled && remainingOverall <= 0) {
-                return@withContext PollingOutcome.Timeout(lastResult, attempt - 1, elapsedMs)
-            }
+                val elapsedMs = startMark.elapsedNow().inWholeMilliseconds
+                val remainingOverall =
+                    if (policy.isOverallTimeoutDisabled) Long.MAX_VALUE else policy.overallTimeoutMs - elapsedMs
+                if (!policy.isOverallTimeoutDisabled && remainingOverall <= 0) {
+                    return@withContext PollingOutcome.Timeout(lastResult, attempt - 1, elapsedMs)
+                }
 
-            // Execute one attempt with per-attempt timeout if configured
-            val result: PollingResult<T> = try {
-                val timeoutMs = policy.perAttemptTimeoutMs
-                if (timeoutMs != null) {
-                    withTimeout(minOf(timeoutMs, remainingOverall).milliseconds) {
-                        // Preface only the first attempt immediately
-                        if (attempt == 1) {
-                            config.onAttempt(attempt, 0)
+                // Execute one attempt with per-attempt timeout if configured
+                val result: PollingResult<T> =
+                    try {
+                        val timeoutMs = policy.perAttemptTimeoutMs
+                        if (timeoutMs != null) {
+                            withTimeout(minOf(timeoutMs, remainingOverall).milliseconds) {
+                                // Preface only the first attempt immediately
+                                if (attempt == 1) {
+                                    config.onAttempt(attempt, 0)
+                                }
+                                config.fetch()
+                            }
+                        } else {
+                            // Preface only the first attempt immediately
+                            if (attempt == 1) {
+                                config.onAttempt(attempt, 0)
+                            }
+                            config.fetch()
                         }
-                        config.fetch()
+                    } catch (ce: CancellationException) {
+                        // If scope is not active -> real cancellation; else treat as rogue and convert to Failure
+                        if (!isActive) throw ce
+                        Failure(config.throwableMapper(ce))
+                    } catch (t: Throwable) {
+                        Failure(config.throwableMapper(t))
                     }
-                } else {
-                    // Preface only the first attempt immediately
-                    if (attempt == 1) {
-                        config.onAttempt(attempt, 0)
-                    }
-                    config.fetch()
-                }
-            } catch (ce: CancellationException) {
-                // If scope is not active -> real cancellation; else treat as rogue and convert to Failure
-                if (!isActive) throw ce
-                Failure(config.throwableMapper(ce))
-            } catch (t: Throwable) {
-                Failure(config.throwableMapper(t))
-            }
 
-            config.onResult(attempt, result)
-            lastResult = result
+                config.onResult(attempt, result)
+                lastResult = result
 
-            // F4: non-success terminal stop predicate ends polling without a Success outcome.
-            if (config.stopWhen(result)) {
-                val totalMs = startMark.elapsedNow().inWholeMilliseconds
-                val outcome = PollingOutcome.Exhausted(result, attempt, totalMs)
-                config.onComplete(attempt, totalMs, outcome)
-                return@withContext outcome
-            }
-
-            when (result) {
-                is Success -> {
-                    val v = result.data
-                    // Stream every success value before deciding on terminal success.
-                    emit(v)
-                    if (config.isTerminalSuccess(v)) {
-                        val totalMs = startMark.elapsedNow().inWholeMilliseconds
-                        val outcome = PollingOutcome.Success(v, attempt, totalMs)
-                        config.onComplete(attempt, totalMs, outcome)
-                        return@withContext outcome
-                    }
-                    // success but not terminal; continue retrying
-                }
-
-                is Failure -> {
-                    if (!config.shouldRetryOnError(result.error)) {
-                        val totalMs = startMark.elapsedNow().inWholeMilliseconds
-                        val outcome = PollingOutcome.Exhausted(result, attempt, totalMs)
-                        config.onComplete(attempt, totalMs, outcome)
-                        return@withContext outcome
-                    }
-                }
-
-                is Cancelled -> {
+                // F4: non-success terminal stop predicate ends polling without a Success outcome.
+                if (config.stopWhen(result)) {
                     val totalMs = startMark.elapsedNow().inWholeMilliseconds
-                    val outcome = PollingOutcome.Cancelled(attempt, totalMs)
+                    val outcome = PollingOutcome.Exhausted(result, attempt, totalMs)
                     config.onComplete(attempt, totalMs, outcome)
                     return@withContext outcome
                 }
 
-                is Waiting, is Unknown -> {
-                    // Treat as retryable states
+                when (result) {
+                    is Success -> {
+                        val v = result.data
+                        // Stream every success value before deciding on terminal success.
+                        emit(v)
+                        if (config.isTerminalSuccess(v)) {
+                            val totalMs = startMark.elapsedNow().inWholeMilliseconds
+                            val outcome = PollingOutcome.Success(v, attempt, totalMs)
+                            config.onComplete(attempt, totalMs, outcome)
+                            return@withContext outcome
+                        }
+                        // success but not terminal; continue retrying
+                    }
+
+                    is Failure -> {
+                        if (!config.shouldRetryOnError(result.error)) {
+                            val totalMs = startMark.elapsedNow().inWholeMilliseconds
+                            val outcome = PollingOutcome.Exhausted(result, attempt, totalMs)
+                            config.onComplete(attempt, totalMs, outcome)
+                            return@withContext outcome
+                        }
+                    }
+
+                    is Cancelled -> {
+                        val totalMs = startMark.elapsedNow().inWholeMilliseconds
+                        val outcome = PollingOutcome.Cancelled(attempt, totalMs)
+                        config.onComplete(attempt, totalMs, outcome)
+                        return@withContext outcome
+                    }
+
+                    is Waiting, is Unknown -> {
+                        // Treat as retryable states
+                    }
+                }
+
+                // Compute jittered delay around current base (use latest policy)
+                val base = nextDelay.coerceAtMost(policy.maxDelayMs)
+                val sleepMs = policy.computeJitteredDelay(base).coerceAtMost(policy.maxDelayMs)
+
+                // Increase delay for next cycle using current policy
+                val multiplied = (nextDelay.toDouble() * policy.multiplier)
+                nextDelay = multiplied.toLong().coerceAtMost(policy.maxDelayMs)
+
+                // Respect overall timeout before sleeping
+                val elapsedBeforeSleep = startMark.elapsedNow().inWholeMilliseconds
+                val remainingBeforeSleep =
+                    if (policy.isOverallTimeoutDisabled) Long.MAX_VALUE else policy.overallTimeoutMs - elapsedBeforeSleep
+                if (!policy.isOverallTimeoutDisabled && remainingBeforeSleep <= 0) break
+
+                // Provide the actual computed delay for the NEXT attempt's preface (attempt+1)
+                // Only announce if there is time left to sleep and another attempt could happen.
+                val nextAttemptIndex = attempt + 1
+                if (policy.isAttemptsUnlimited || nextAttemptIndex <= policy.maxAttempts) {
+                    config.onAttempt(nextAttemptIndex, sleepMs)
+                }
+
+                // Wait for the required delay, pausing countdown if paused
+                var remainingDelay = minOf(sleepMs, remainingBeforeSleep)
+                val delayStep = 100L // ms granularity for checking pause/resume
+                while (remainingDelay > 0) {
+                    if (control.state.value == State.Paused) {
+                        // Wait until resumed
+                        control.state.map { it == State.Running }.first { it }
+                    } else {
+                        val step = minOf(delayStep, remainingDelay)
+                        delay(step.milliseconds)
+                        remainingDelay -= step
+                    }
                 }
             }
 
-            // Compute jittered delay around current base (use latest policy)
-            val base = nextDelay.coerceAtMost(policy.maxDelayMs)
-            val sleepMs = policy.computeJitteredDelay(base).coerceAtMost(policy.maxDelayMs)
-
-            // Increase delay for next cycle using current policy
-            val multiplied = (nextDelay.toDouble() * policy.multiplier)
-            nextDelay = multiplied.toLong().coerceAtMost(policy.maxDelayMs)
-
-            // Respect overall timeout before sleeping
-            val elapsedBeforeSleep = startMark.elapsedNow().inWholeMilliseconds
-            val remainingBeforeSleep =
-                if (policy.isOverallTimeoutDisabled) Long.MAX_VALUE else policy.overallTimeoutMs - elapsedBeforeSleep
-            if (!policy.isOverallTimeoutDisabled && remainingBeforeSleep <= 0) break
-
-            // Provide the actual computed delay for the NEXT attempt's preface (attempt+1)
-            // Only announce if there is time left to sleep and another attempt could happen.
-            val nextAttemptIndex = attempt + 1
-            if (policy.isAttemptsUnlimited || nextAttemptIndex <= policy.maxAttempts) {
-                config.onAttempt(nextAttemptIndex, sleepMs)
-            }
-
-            // Wait for the required delay, pausing countdown if paused
-            var remainingDelay = minOf(sleepMs, remainingBeforeSleep)
-            val delayStep = 100L // ms granularity for checking pause/resume
-            while (remainingDelay > 0) {
-                if (control.state.value == State.Paused) {
-                    // Wait until resumed
-                    control.state.map { it == State.Running }.first { it }
+            val totalMs = startMark.elapsedNow().inWholeMilliseconds
+            val finalPolicy = control.backoff.value ?: config.backoff
+            val outcome =
+                if (!finalPolicy.isOverallTimeoutDisabled && totalMs >= finalPolicy.overallTimeoutMs) {
+                    PollingOutcome.Timeout(lastResult, attempt, totalMs)
                 } else {
-                    val step = minOf(delayStep, remainingDelay)
-                    delay(step.milliseconds)
-                    remainingDelay -= step
+                    PollingOutcome.Exhausted(lastResult, attempt, totalMs)
                 }
-            }
+            config.onComplete(attempt, totalMs, outcome)
+            outcome
         }
-
-        val totalMs = startMark.elapsedNow().inWholeMilliseconds
-        val finalPolicy = control.backoff.value ?: config.backoff
-        val outcome =
-            if (!finalPolicy.isOverallTimeoutDisabled && totalMs >= finalPolicy.overallTimeoutMs) {
-                PollingOutcome.Timeout(lastResult, attempt, totalMs)
-            } else {
-                PollingOutcome.Exhausted(lastResult, attempt, totalMs)
-            }
-        config.onComplete(attempt, totalMs, outcome)
-        outcome
-    }
 
     /**
      * [SharedPoll] backed by a single [shareIn]'d upstream, giving one [PollingConfig.fetch]
@@ -394,15 +409,18 @@ internal object PollingEngine {
         stopTimeoutMs: Long,
         replay: Int,
     ) : SharedPoll<T> {
-        private val shared: SharedFlow<T> = upstream.shareIn(
-            scope = scope,
-            started = SharingStarted.WhileSubscribed(
-                stopTimeoutMillis = stopTimeoutMs.coerceAtLeast(
-                    0L
-                )
-            ),
-            replay = replay.coerceAtLeast(0),
-        )
+        private val shared: SharedFlow<T> =
+            upstream.shareIn(
+                scope = scope,
+                started =
+                    SharingStarted.WhileSubscribed(
+                        stopTimeoutMillis =
+                            stopTimeoutMs.coerceAtLeast(
+                                0L,
+                            ),
+                    ),
+                replay = replay.coerceAtLeast(0),
+            )
 
         override fun stream(): Flow<T> = shared
 

@@ -44,13 +44,14 @@ public class BackoffSpec {
     /** Optional per-attempt timeout; `null` disables it. */
     public var perAttemptTimeout: Duration? = null
 
-    internal fun toPolicy(): BackoffPolicy = BackoffPolicy(
-        initialDelayMs = initialDelay.inWholeMilliseconds,
-        maxDelayMs = maxDelay.inWholeMilliseconds,
-        multiplier = multiplier,
-        jitterRatio = jitter,
-        maxAttempts = maxAttempts ?: BackoffPolicy.UNLIMITED_ATTEMPTS,
-        overallTimeoutMs = overallTimeout?.inWholeMilliseconds ?: BackoffPolicy.NO_TIMEOUT,
-        perAttemptTimeoutMs = perAttemptTimeout?.inWholeMilliseconds,
-    )
+    internal fun toPolicy(): BackoffPolicy =
+        BackoffPolicy(
+            initialDelayMs = initialDelay.inWholeMilliseconds,
+            maxDelayMs = maxDelay.inWholeMilliseconds,
+            multiplier = multiplier,
+            jitterRatio = jitter,
+            maxAttempts = maxAttempts ?: BackoffPolicy.UNLIMITED_ATTEMPTS,
+            overallTimeoutMs = overallTimeout?.inWholeMilliseconds ?: BackoffPolicy.NO_TIMEOUT,
+            perAttemptTimeoutMs = perAttemptTimeout?.inWholeMilliseconds,
+        )
 }

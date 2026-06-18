@@ -7,15 +7,16 @@ internal object BackoffPolicies {
     /**
      * Quick polling tuned for short-lived availability (e.g., compliance status) with ~20s cap.
      */
-    public val quick20s: BackoffPolicy = BackoffPolicy(
-        initialDelayMs = 500,
-        maxDelayMs = 5_000,
-        multiplier = 1.8,
-        jitterRatio = 0.2,
-        maxAttempts = 20,
-        overallTimeoutMs = 20_000,
-        perAttemptTimeoutMs = 10000,
-    )
+    public val quick20s: BackoffPolicy =
+        BackoffPolicy(
+            initialDelayMs = 500,
+            maxDelayMs = 5_000,
+            multiplier = 1.8,
+            jitterRatio = 0.2,
+            maxAttempts = 20,
+            overallTimeoutMs = 20_000,
+            perAttemptTimeoutMs = 10000,
+        )
 
     /**
      * Constant-cadence polling: one attempt every [intervalMs] with no growth and no jitter.

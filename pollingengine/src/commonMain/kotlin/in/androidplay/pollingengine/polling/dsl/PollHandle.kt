@@ -51,8 +51,11 @@ internal class EngineSessionHandle<T>(
     override val isPaused: Boolean get() = session.isPaused
 
     override suspend fun pause(): Unit = session.pause()
+
     override suspend fun resume(): Unit = session.resume()
+
     override suspend fun cancel(): Unit = session.cancel()
+
     override fun retune(backoff: BackoffSpec.() -> Unit) {
         session.retune(BackoffSpec().apply(backoff).toPolicy())
     }

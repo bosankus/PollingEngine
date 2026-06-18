@@ -25,7 +25,7 @@ internal object RetryPredicates {
             ErrorCodes.SERVER_ERROR_CODE,
             ErrorCodes.TIMEOUT_ERROR_CODE,
             ErrorCodes.UNKNOWN_ERROR_CODE,
-                -> true
+            -> true
             else -> false
         }
     }

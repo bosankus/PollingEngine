@@ -13,7 +13,6 @@ import kotlinx.coroutines.TimeoutCancellationException
  * - Pick one of these mappers based on your environment to translate throwables into retry-friendly codes.
  */
 internal object ThrowableMappers {
-
     /**
      * Default mapper for network-like environments.
      * - TimeoutCancellationException -> TIMEOUT_ERROR_CODE

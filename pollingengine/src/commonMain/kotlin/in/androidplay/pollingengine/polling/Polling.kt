@@ -26,15 +26,13 @@ public object Polling {
      * Begin describing a poll whose [fetch] returns a plain value each tick (throw to signal an
      * error — it is mapped and run through the retry policy). This is the common entry point.
      */
-    public fun <T> poll(fetch: suspend () -> T): PollBuilder<T> =
-        PollBuilder { PollingResult.Success(fetch()) }
+    public fun <T> poll(fetch: suspend () -> T): PollBuilder<T> = PollBuilder { PollingResult.Success(fetch()) }
 
     /**
      * Advanced entry point for fetches that need the full [PollingResult] vocabulary (e.g.
      * [PollingResult.Waiting] to signal "no value yet, keep polling" without a terminal check).
      */
-    public fun <T> pollResult(fetch: suspend () -> PollingResult<T>): PollBuilder<T> =
-        PollBuilder(fetch)
+    public fun <T> pollResult(fetch: suspend () -> PollingResult<T>): PollBuilder<T> = PollBuilder(fetch)
 
     /**
      * Run several polls in order, stopping at the first that does not succeed. Returns the last

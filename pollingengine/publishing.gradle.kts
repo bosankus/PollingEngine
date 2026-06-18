@@ -8,32 +8,41 @@ fun prop(name: String): String? =
         ?.trim()
         ?.takeIf { it.isNotEmpty() }
 
-val signingEnabledGate: Boolean = run {
-    val fromProp = prop("signing.enabled")
-        ?.toBooleanStrictOrNull()
-    val fromEnv = System.getenv("SIGNING_ENABLED")
-        ?.trim()
-        ?.takeIf { it.isNotEmpty() }
-        ?.toBooleanStrictOrNull()
-    (fromProp ?: fromEnv) == true
-}
+val signingEnabledGate: Boolean =
+    run {
+        val fromProp =
+            prop("signing.enabled")
+                ?.toBooleanStrictOrNull()
+        val fromEnv =
+            System
+                .getenv("SIGNING_ENABLED")
+                ?.trim()
+                ?.takeIf { it.isNotEmpty() }
+                ?.toBooleanStrictOrNull()
+        (fromProp ?: fromEnv) == true
+    }
 
 // In-memory signing: vanniktech reads signingInMemoryKey/KeyId/KeyPassword (used by CI).
 // Also accept the legacy "signing.key" name for backwards compatibility.
-val hasInMemorySigning: Boolean = listOf("signingInMemoryKey", "signing.key")
-    .any { prop(it)?.isNotBlank() == true }
+val hasInMemorySigning: Boolean =
+    listOf("signingInMemoryKey", "signing.key")
+        .any { prop(it)?.isNotBlank() == true }
 
-val hasSecretKeyRingSigning: Boolean = run {
-    val keyRing = prop("signing.secretKeyRingFile")
-    val passwordOk = prop("signing.password")
-        ?.isNotBlank() == true
-    keyRing?.let { file(it).exists() } == true && passwordOk
-}
+val hasSecretKeyRingSigning: Boolean =
+    run {
+        val keyRing = prop("signing.secretKeyRingFile")
+        val passwordOk =
+            prop("signing.password")
+                ?.isNotBlank() == true
+        keyRing?.let { file(it).exists() } == true && passwordOk
+    }
 
 val shouldSignPublications: Boolean =
     signingEnabledGate && (hasInMemorySigning || hasSecretKeyRingSigning)
 
-println("[mavenPublishing] Signing detection -> gate=$signingEnabledGate, inMemory=$hasInMemorySigning, secretKeyRing=$hasSecretKeyRingSigning, shouldSign=$shouldSignPublications")
+println(
+    "[mavenPublishing] Signing detection -> gate=$signingEnabledGate, inMemory=$hasInMemorySigning, secretKeyRing=$hasSecretKeyRingSigning, shouldSign=$shouldSignPublications",
+)
 
 // Ensure any auto-wired signing tasks are skipped when no credentials are present
 tasks.withType(Sign::class.java).configureEach {
@@ -50,7 +59,7 @@ extensions.getByName("mavenPublishing").withGroovyBuilder {
         "signAllPublications"()
     } else {
         println(
-            "[mavenPublishing] No signing config detected. Skipping signing of publications."
+            "[mavenPublishing] No signing config detected. Skipping signing of publications.",
         )
     }
 
@@ -59,22 +68,22 @@ extensions.getByName("mavenPublishing").withGroovyBuilder {
         fun p(key: String) = providers.gradleProperty(key)
         // Top-level POM fields
         (getProperty("name") as Property<String>).set(
-            p("pom.name")
+            p("pom.name"),
         )
         (getProperty("description") as Property<String>).set(
-            p("pom.description")
+            p("pom.description"),
         )
         (getProperty("url") as Property<String>).set(
-            p("pom.url")
+            p("pom.url"),
         )
         // Licenses
         "licenses" {
             "license" {
                 (getProperty("name") as Property<String>).set(
-                    p("pom.license.name")
+                    p("pom.license.name"),
                 )
                 (getProperty("url") as Property<String>).set(
-                    p("pom.license.url")
+                    p("pom.license.url"),
                 )
             }
         }
@@ -82,26 +91,26 @@ extensions.getByName("mavenPublishing").withGroovyBuilder {
         "developers" {
             "developer" {
                 (getProperty("id") as Property<String>).set(
-                    p("pom.developer.id")
+                    p("pom.developer.id"),
                 )
                 (getProperty("name") as Property<String>).set(
-                    p("pom.developer.name")
+                    p("pom.developer.name"),
                 )
                 (getProperty("url") as Property<String>).set(
-                    p("pom.developer.url")
+                    p("pom.developer.url"),
                 )
             }
         }
         // SCM
         "scm" {
             (getProperty("url") as Property<String>).set(
-                p("pom.scm.url")
+                p("pom.scm.url"),
             )
             (getProperty("connection") as Property<String>).set(
-                p("pom.scm.connection")
+                p("pom.scm.connection"),
             )
             (getProperty("developerConnection") as Property<String>).set(
-                p("pom.scm.developerConnection")
+                p("pom.scm.developerConnection"),
             )
         }
     }
