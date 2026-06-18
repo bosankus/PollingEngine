@@ -23,11 +23,17 @@ public data class PollingConfig<T>(
         // Use a stable public default code without exposing internal ErrorCodes
         Error(-1, msg)
     },
-) {
-    init {
-        requireNotNull(fetch) { "fetch must not be null" }
-        requireNotNull(isTerminalSuccess) { "isTerminalSuccess must not be null" }
-        requireNotNull(shouldRetryOnError) { "shouldRetryOnError must not be null" }
-        requireNotNull(dispatcher) { "dispatcher must not be null" }
-    }
-}
+    /**
+     * Optional non-success terminal predicate. When it returns true for a poll result,
+     * polling ends immediately *without* a [PollingOutcome.Success] — the converge APIs
+     * ([Polling.run]/[Polling.startPolling]) report [PollingOutcome.Exhausted] carrying that
+     * result, and the streaming APIs ([Polling.observe]/[Polling.shared]) simply complete.
+     * Distinct from [isTerminalSuccess]; defaults to never stopping.
+     *
+     * Example: stop a list observer once the remote list drains.
+     * ```
+     * stopWhen = { it is PollingResult.Success && it.data.isEmpty() }
+     * ```
+     */
+    val stopWhen: (PollingResult<T>) -> Boolean = { false },
+)

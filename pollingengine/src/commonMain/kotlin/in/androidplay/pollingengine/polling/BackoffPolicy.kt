@@ -1,5 +1,7 @@
 package `in`.androidplay.pollingengine.polling
 
+import `in`.androidplay.pollingengine.polling.BackoffPolicy.Companion.NO_TIMEOUT
+import `in`.androidplay.pollingengine.polling.BackoffPolicy.Companion.UNLIMITED_ATTEMPTS
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.random.Random
@@ -14,7 +16,9 @@ public data class BackoffPolicy(
     val multiplier: Double = 2.0,
     /** Ratio in [0.0, 1.0]. 0 = no jitter. */
     val jitterRatio: Double = 0.2,
+    /** Maximum number of attempts, or [UNLIMITED_ATTEMPTS] (0) for no attempt limit. */
     val maxAttempts: Int = 8,
+    /** Overall wall-clock budget in ms, or [NO_TIMEOUT] (0) for no overall timeout. */
     val overallTimeoutMs: Long = 120_000,
     /** Optional per-attempt timeout; null to disable. Must be > 0 when set. */
     val perAttemptTimeoutMs: Long? = null,
@@ -24,8 +28,12 @@ public data class BackoffPolicy(
     init {
         require(initialDelayMs >= 0) { "initialDelayMs must be >= 0, was $initialDelayMs" }
         require(maxDelayMs > 0) { "maxDelayMs must be > 0, was $maxDelayMs" }
-        require(maxAttempts > 0) { "maxAttempts must be > 0, was $maxAttempts" }
-        require(overallTimeoutMs > 0) { "overallTimeoutMs must be > 0, was $overallTimeoutMs" }
+        require(maxAttempts >= 0) {
+            "maxAttempts must be >= 0 ($UNLIMITED_ATTEMPTS = unlimited), was $maxAttempts"
+        }
+        require(overallTimeoutMs >= 0) {
+            "overallTimeoutMs must be >= 0 ($NO_TIMEOUT = no timeout), was $overallTimeoutMs"
+        }
         require(multiplier >= 1.0) { "multiplier must be >= 1.0, was $multiplier" }
         require(jitterRatio in 0.0..1.0) { "jitterRatio must be in [0.0, 1.0], was $jitterRatio" }
         if (perAttemptTimeoutMs != null) {
@@ -35,6 +43,12 @@ public data class BackoffPolicy(
             "maxDelayMs ($maxDelayMs) must be >= initialDelayMs ($initialDelayMs)"
         }
     }
+
+    /** True when polling should run without an attempt limit (see [UNLIMITED_ATTEMPTS]). */
+    public val isAttemptsUnlimited: Boolean get() = maxAttempts == UNLIMITED_ATTEMPTS
+
+    /** True when polling should run without an overall wall-clock budget (see [NO_TIMEOUT]). */
+    public val isOverallTimeoutDisabled: Boolean get() = overallTimeoutMs == NO_TIMEOUT
 
     /**
      * Computes randomized delay around a base using jitter, clamped to [0, maxDelayMs].
@@ -48,5 +62,13 @@ public data class BackoffPolicy(
         if (maxBound <= minBound) return minBound
         val exclusiveUpper = if (maxBound == Long.MAX_VALUE) maxBound else maxBound + 1
         return random.nextLong(minBound, exclusiveUpper)
+    }
+
+    public companion object {
+        /** Sentinel for [maxAttempts] meaning "no attempt limit" (poll indefinitely). */
+        public const val UNLIMITED_ATTEMPTS: Int = 0
+
+        /** Sentinel for [overallTimeoutMs] meaning "no overall wall-clock timeout". */
+        public const val NO_TIMEOUT: Long = 0L
     }
 }

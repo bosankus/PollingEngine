@@ -33,6 +33,26 @@ public object Polling : PollingApi {
         return startPolling(config)
     }
 
+    override fun <T> observe(
+        builder: PollingConfigBuilder<T>.() -> Unit
+    ): Flow<T> {
+        val config = PollingConfigBuilder<T>().apply(builder).buildForStreaming()
+        return PollingEngine.observe(config)
+    }
+
+    override suspend fun <T> shared(
+        key: Any,
+        builder: PollingConfigBuilder<T>.() -> Unit
+    ): SharedPollingSession<T> {
+        val configured = PollingConfigBuilder<T>().apply(builder)
+        return PollingEngine.shared(
+            key = key,
+            config = configured.buildForStreaming(),
+            stopTimeoutMs = configured.stopTimeoutMs,
+            replay = configured.replay,
+        )
+    }
+
     override suspend fun <T> run(config: PollingConfig<T>): PollingOutcome<T> =
         PollingEngine.pollUntil(config)
 

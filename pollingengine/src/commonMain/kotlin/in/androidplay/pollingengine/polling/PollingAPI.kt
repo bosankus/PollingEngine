@@ -45,6 +45,27 @@ public interface PollingApi {
         builder: PollingConfigBuilder<T>.() -> Unit
     ): Flow<PollingOutcome<T>>
 
+    /**
+     * Continuous streaming poll: emits the value of **every** successful tick (not just a terminal
+     * outcome) and does not auto-complete until a stop condition fires (terminal success,
+     * [PollingConfig.stopWhen], a non-retryable failure, or attempt/overall limits). Retryable
+     * per-tick errors are surfaced via the builder hooks and skipped. Pair with an unbounded policy
+     * (e.g. [BackoffPolicies.fixed]) for an always-on observer.
+     */
+    public fun <T> observe(
+        builder: PollingConfigBuilder<T>.() -> Unit
+    ): Flow<T>
+
+    /**
+     * Create (or reuse) a multiplexed [SharedPollingSession] for [key]. One poll loop per key makes a
+     * single fetch per tick and fans results out to all subscribers, started while subscribed. The
+     * same [key] returns the same live session; a different [key] starts a separate one.
+     */
+    public suspend fun <T> shared(
+        key: Any,
+        builder: PollingConfigBuilder<T>.() -> Unit
+    ): SharedPollingSession<T>
+
     /** One-shot polling that runs to completion synchronously (suspending). */
     public suspend fun <T> run(config: PollingConfig<T>): PollingOutcome<T>
 

@@ -29,7 +29,9 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
@@ -138,7 +140,7 @@ private fun SectionDivider() {
 }
 
 @Composable
-private fun GlowingButton(
+internal fun GlowingButton(
     enabled: Boolean,
     text: String,
     onClick: () -> Unit,
@@ -223,6 +225,48 @@ private fun ControlPanel(
 @Composable
 @Preview
 fun App() {
+    var selectedTab by remember { mutableStateOf(0) }
+    PollingEngineTheme {
+        Column(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+            Spacer(Modifier.height(40.dp))
+            DemoTabBar(selectedTab = selectedTab, onSelect = { selectedTab = it })
+            when (selectedTab) {
+                0 -> PollingTerminalScreen()
+                else -> SharedObserveScreen()
+            }
+        }
+    }
+}
+
+@Composable
+private fun DemoTabBar(selectedTab: Int, onSelect: (Int) -> Unit) {
+    val tabs = listOf("Polling Terminal", "Shared & Observe")
+    Row(
+        modifier = Modifier.fillMaxWidth().padding(horizontal = 24.dp, vertical = 8.dp),
+        horizontalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        tabs.forEachIndexed { idx, label ->
+            val selected = idx == selectedTab
+            Button(
+                onClick = { onSelect(idx) },
+                shape = RoundedCornerShape(10.dp),
+                border = BorderStroke(
+                    1.dp,
+                    if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.outline
+                ),
+                colors = ButtonDefaults.buttonColors(
+                    containerColor = if (selected) MaterialTheme.colorScheme.surface else MaterialTheme.colorScheme.surfaceVariant,
+                    contentColor = if (selected) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            ) {
+                Text(label, fontWeight = if (selected) FontWeight.SemiBold else FontWeight.Normal)
+            }
+        }
+    }
+}
+
+@Composable
+private fun PollingTerminalScreen() {
     val viewModel = remember { PollingViewModel() }
     val uiState by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
@@ -233,8 +277,7 @@ fun App() {
         "Any timeout"
     )
 
-    PollingEngineTheme {
-        Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
+    Box(modifier = Modifier.fillMaxSize().background(MaterialTheme.colorScheme.background)) {
             LazyColumn(
                 state = listState,
                 modifier = Modifier.fillMaxSize(),
@@ -245,7 +288,7 @@ fun App() {
                         horizontalAlignment = Alignment.Start,
                         verticalArrangement = Arrangement.Top
                     ) {
-                        Spacer(Modifier.height(40.dp))
+                        Spacer(Modifier.height(8.dp))
                         // Heading
                         Text(
                             text = "Polling Terminal",
@@ -476,5 +519,4 @@ fun App() {
                 }
             }
         }
-    }
 }

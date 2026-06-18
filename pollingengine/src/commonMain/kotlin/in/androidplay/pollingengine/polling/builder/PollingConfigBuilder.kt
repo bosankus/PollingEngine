@@ -28,18 +28,54 @@ public class PollingConfigBuilder<T> {
         Error(-1, msg)
     }
 
-    public fun build(): PollingConfig<T> {
+    /**
+     * Optional non-success terminal predicate. See [PollingConfig.stopWhen]. Defaults to never.
+     */
+    public var stopWhen: (PollingResult<T>) -> Boolean = { false }
+
+    /**
+     * Streaming-only: grace period (ms) a [in.androidplay.pollingengine.polling.shared] session
+     * keeps polling after its last subscriber leaves before stopping. 0 stops immediately.
+     * Ignored by [build]/`startPolling`/`run`.
+     */
+    public var stopTimeoutMs: Long = 0
+
+    /**
+     * Streaming-only: number of most-recent values replayed to late subscribers of a
+     * [in.androidplay.pollingengine.polling.shared] session. Defaults to 1 (last value).
+     * Ignored by [build]/`startPolling`/`run`.
+     */
+    public var replay: Int = 1
+
+    /**
+     * Builds a converge-mode [PollingConfig]. Requires both [fetch] and [isTerminalSuccess].
+     * Used by `startPolling`/`run`/`compose`.
+     */
+    public fun build(): PollingConfig<T> = build(
+        terminalSuccess = isTerminalSuccess
+            ?: throw IllegalStateException("isTerminalSuccess must be set"),
+    )
+
+    /**
+     * Builds a streaming-mode [PollingConfig] for `observe`/`shared`. [isTerminalSuccess] is
+     * optional here (defaults to "never terminal") so the stream can run indefinitely.
+     */
+    internal fun buildForStreaming(): PollingConfig<T> = build(
+        terminalSuccess = isTerminalSuccess ?: { false },
+    )
+
+    private fun build(terminalSuccess: (T) -> Boolean): PollingConfig<T> {
         return PollingConfig(
             fetch = fetch ?: throw IllegalStateException("fetch must be set"),
-            isTerminalSuccess = isTerminalSuccess
-                ?: throw IllegalStateException("isTerminalSuccess must be set"),
+            isTerminalSuccess = terminalSuccess,
             shouldRetryOnError = shouldRetryOnError,
             backoff = backoff,
             dispatcher = dispatcher,
             onAttempt = onAttempt,
             onResult = onResult,
             onComplete = onComplete,
-            throwableMapper = throwableMapper
+            throwableMapper = throwableMapper,
+            stopWhen = stopWhen,
         )
     }
 }

@@ -3,6 +3,7 @@ package `in`.androidplay.pollingengine.polling
 import kotlin.random.Random
 import kotlin.test.Test
 import kotlin.test.assertFailsWith
+import kotlin.test.assertFalse
 import kotlin.test.assertTrue
 
 class BackoffPolicyTest {
@@ -15,10 +16,10 @@ class BackoffPolicyTest {
             BackoffPolicy(maxDelayMs = 0)
         }
         assertFailsWith<IllegalArgumentException> {
-            BackoffPolicy(maxAttempts = 0)
+            BackoffPolicy(maxAttempts = -1)
         }
         assertFailsWith<IllegalArgumentException> {
-            BackoffPolicy(overallTimeoutMs = 0)
+            BackoffPolicy(overallTimeoutMs = -1)
         }
         assertFailsWith<IllegalArgumentException> {
             BackoffPolicy(multiplier = 0.9)
@@ -38,6 +39,21 @@ class BackoffPolicyTest {
                 maxDelayMs = 1000,
             )
         }
+    }
+
+    @Test
+    fun unlimitedSentinels_areAcceptedAndFlagged() {
+        // F1: maxAttempts = 0 and overallTimeoutMs = 0 are now valid "unlimited" sentinels.
+        val unlimited = BackoffPolicy(
+            maxAttempts = BackoffPolicy.UNLIMITED_ATTEMPTS,
+            overallTimeoutMs = BackoffPolicy.NO_TIMEOUT,
+        )
+        assertTrue(unlimited.isAttemptsUnlimited)
+        assertTrue(unlimited.isOverallTimeoutDisabled)
+
+        val bounded = BackoffPolicy()
+        assertFalse(bounded.isAttemptsUnlimited)
+        assertFalse(bounded.isOverallTimeoutDisabled)
     }
 
     @Test
