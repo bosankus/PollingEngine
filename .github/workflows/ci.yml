@@ -5,10 +5,18 @@ on:
   push:
     branches: [ main, master ]
 
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build:
     name: Build and Static Checks
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -38,6 +46,6 @@ jobs:
       - name: ktlint
         run: ./gradlew ktlintCheck --stacktrace
       - name: Dokka HTML
-        run: ./gradlew :pollingengine:dokkaHtml --stacktrace
+        run: ./gradlew :pollingengine:dokkaGenerate --stacktrace
       - name: API check (if baseline present)
         run: if [ -d api ]; then ./gradlew :pollingengine:apiCheck --stacktrace; else echo "Skipping apiCheck (no baseline)"; fi

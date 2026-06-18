@@ -10,7 +10,7 @@ import kotlin.random.Random
  * Configuration for exponential backoff with jitter.
  * Provides validation to ensure safe, production-ready defaults.
  */
-public data class BackoffPolicy(
+internal data class BackoffPolicy(
     val initialDelayMs: Long = 500,
     val maxDelayMs: Long = 30_000,
     val multiplier: Double = 2.0,

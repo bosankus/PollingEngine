@@ -32,7 +32,7 @@ class PollingEngineCoreTests {
             )
         )
 
-        val outcome = Polling.run(config)
+        val outcome = PollingEngine.pollUntil(config)
         assertTrue(outcome is PollingOutcome.Success)
         assertEquals(100, outcome.value)
         assertEquals(3, outcome.attempts)
@@ -54,7 +54,7 @@ class PollingEngineCoreTests {
             )
         )
 
-        val outcome = Polling.run(config)
+        val outcome = PollingEngine.pollUntil(config)
         assertTrue(outcome is PollingOutcome.Exhausted)
         assertTrue(outcome.last is Failure)
         assertEquals(1, outcome.attempts)
@@ -79,7 +79,7 @@ class PollingEngineCoreTests {
                 overallTimeoutMs = 5_000,
             )
         )
-        val outcome = Polling.run(config)
+        val outcome = PollingEngine.pollUntil(config)
         assertTrue(outcome is PollingOutcome.Exhausted)
         assertEquals(3, outcome.attempts)
     }
@@ -103,7 +103,7 @@ class PollingEngineCoreTests {
                 overallTimeoutMs = 5 // very small overall timeout
             )
         )
-        val outcome = Polling.run(config)
+        val outcome = PollingEngine.pollUntil(config)
         assertTrue(outcome is PollingOutcome.Timeout, "Expected Timeout but was $outcome")
     }
 
@@ -134,7 +134,7 @@ class PollingEngineCoreTests {
                 overallTimeoutMs = 100
             )
         )
-        val outcome = Polling.compose(cfg1, cfg2)
+        val outcome = PollingEngine.compose(cfg1, cfg2)
         assertTrue(outcome is PollingOutcome.Exhausted)
         assertEquals(1, outcome.attempts)
     }

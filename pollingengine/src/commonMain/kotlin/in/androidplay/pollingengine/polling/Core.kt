@@ -11,46 +11,15 @@ internal object ErrorCodes {
     internal const val TIMEOUT_ERROR_CODE: Int = 1002
 }
 
-// --- Strategies ---
-internal interface FetchStrategy<T> {
-    suspend fun fetch(): PollingResult<T>
-}
-
-internal interface SuccessStrategy<T> {
-    fun isTerminal(value: T): Boolean
-}
-
-internal interface RetryStrategy {
-    fun shouldRetry(error: Error?): Boolean
-}
-
-internal class LambdaFetchStrategy<T>(
-    private val block: suspend () -> PollingResult<T>,
-) : FetchStrategy<T> {
-    override suspend fun fetch(): PollingResult<T> = block()
-}
-
-internal class LambdaSuccessStrategy<T>(
-    private val predicate: (T) -> Boolean,
-) : SuccessStrategy<T> {
-    override fun isTerminal(value: T): Boolean = predicate(value)
-}
-
-internal class LambdaRetryStrategy(
-    private val predicate: (Error?) -> Boolean,
-) : RetryStrategy {
-    override fun shouldRetry(error: Error?): Boolean = predicate(error)
-}
-
 /**
- * Common retry strategies for polling. Use these to avoid boilerplate and ensure consistency.
+ * Common retry predicates, reused by the public [Retry] presets and the engine defaults.
  */
-public object RetryPredicates {
+internal object RetryPredicates {
     /**
      * Retry for network-related, server, timeout, and unknown errors.
      * Recommended for most network polling scenarios.
      */
-    public val networkOrServerOrTimeout: (Error?) -> Boolean = { err ->
+    val networkOrServerOrTimeout: (Error?) -> Boolean = { err ->
         when (err?.code) {
             ErrorCodes.NETWORK_ERROR,
             ErrorCodes.SERVER_ERROR_CODE,
@@ -62,10 +31,10 @@ public object RetryPredicates {
     }
 
     /** Always retry regardless of error. */
-    public val always: (Error?) -> Boolean = { true }
+    val always: (Error?) -> Boolean = { true }
 
     /** Never retry on error. */
-    public val never: (Error?) -> Boolean = { false }
+    val never: (Error?) -> Boolean = { false }
 }
 
 // --- Polling outcome ---

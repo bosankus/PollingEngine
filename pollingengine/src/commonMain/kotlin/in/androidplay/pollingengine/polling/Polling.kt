@@ -1,61 +1,57 @@
 package `in`.androidplay.pollingengine.polling
 
-import `in`.androidplay.pollingengine.polling.builder.PollingConfigBuilder
-import kotlinx.coroutines.flow.Flow
+import `in`.androidplay.pollingengine.models.PollingResult
+import `in`.androidplay.pollingengine.polling.dsl.PollBuilder
 
 /**
- * Public facade instance for consumers. Delegates to the internal engine.
+ * The single entry point to the polling engine. Start a poll by describing it in a sentence:
  *
- * This is the single entry-point to start, control, and run polling operations.
+ * ```
+ * // Converge: poll until done, then stop.
+ * Polling.poll { api.checkStatus() }
+ *     .until { it == "COMPLETED" }
+ *     .every(2.seconds)
+ *     .start(scope)
+ *
+ * // Observe: react to every value.
+ * Polling.poll { api.queuePosition() }
+ *     .every(2.seconds)
+ *     .collect(scope) { position -> ui.update(position) }
+ * ```
+ *
+ * See [PollBuilder] for the full set of refinements and terminal verbs.
  */
-public object Polling : PollingApi {
-    override fun activePollsCount(): Int = PollingEngine.activePollsCount()
-    override suspend fun listActiveIds(): List<String> = PollingEngine.listActiveIds()
+public object Polling {
+    /**
+     * Begin describing a poll whose [fetch] returns a plain value each tick (throw to signal an
+     * error — it is mapped and run through the retry policy). This is the common entry point.
+     */
+    public fun <T> poll(fetch: suspend () -> T): PollBuilder<T> =
+        PollBuilder { PollingResult.Success(fetch()) }
 
-    override suspend fun cancel(id: String): Unit = PollingEngine.cancel(id)
-    override suspend fun cancel(session: PollingSession): Unit = PollingEngine.cancel(session.id)
-    override suspend fun cancelAll(): Unit = PollingEngine.cancelAll()
-    override suspend fun shutdown(): Unit = PollingEngine.shutdown()
+    /**
+     * Advanced entry point for fetches that need the full [PollingResult] vocabulary (e.g.
+     * [PollingResult.Waiting] to signal "no value yet, keep polling" without a terminal check).
+     */
+    public fun <T> pollResult(fetch: suspend () -> PollingResult<T>): PollBuilder<T> =
+        PollBuilder(fetch)
 
-    override suspend fun pause(id: String): Unit = PollingEngine.pause(id)
-    override suspend fun resume(id: String): Unit = PollingEngine.resume(id)
-    override suspend fun updateBackoff(id: String, newPolicy: BackoffPolicy): Unit =
-        PollingEngine.updateBackoff(id, newPolicy)
+    /**
+     * Run several polls in order, stopping at the first that does not succeed. Returns the last
+     * outcome (the final success, or the first non-success). Replaces the old `compose`.
+     */
+    public suspend fun <T> sequence(vararg polls: PollBuilder<T>): PollingOutcome<T> =
+        PollingEngine.compose(*Array(polls.size) { polls[it].buildConfig() })
 
-    override fun <T> startPolling(
-        config: PollingConfig<T>
-    ): Flow<PollingOutcome<T>> = PollingEngine.startPolling(config)
+    /** Number of polls currently running across the engine (diagnostics). */
+    public val activeCount: Int get() = PollingEngine.activePollsCount()
 
-    override fun <T> startPolling(
-        builder: PollingConfigBuilder<T>.() -> Unit
-    ): Flow<PollingOutcome<T>> {
-        val config = PollingConfigBuilder<T>().apply(builder).build()
-        return startPolling(config)
-    }
+    /** Ids of the polls currently running (diagnostics). */
+    public suspend fun activeIds(): List<String> = PollingEngine.listActiveIds()
 
-    override fun <T> observe(
-        builder: PollingConfigBuilder<T>.() -> Unit
-    ): Flow<T> {
-        val config = PollingConfigBuilder<T>().apply(builder).buildForStreaming()
-        return PollingEngine.observe(config)
-    }
+    /** Cancel every running poll. Individual polls are better cancelled via their `PollHandle`. */
+    public suspend fun cancelAll(): Unit = PollingEngine.cancelAll()
 
-    override suspend fun <T> shared(
-        key: Any,
-        builder: PollingConfigBuilder<T>.() -> Unit
-    ): SharedPollingSession<T> {
-        val configured = PollingConfigBuilder<T>().apply(builder)
-        return PollingEngine.shared(
-            key = key,
-            config = configured.buildForStreaming(),
-            stopTimeoutMs = configured.stopTimeoutMs,
-            replay = configured.replay,
-        )
-    }
-
-    override suspend fun <T> run(config: PollingConfig<T>): PollingOutcome<T> =
-        PollingEngine.pollUntil(config)
-
-    override suspend fun <T> compose(vararg configs: PollingConfig<T>): PollingOutcome<T> =
-        PollingEngine.compose(*configs)
+    /** Shut the engine down. After shutdown, new polls cannot be started. */
+    public suspend fun shutdown(): Unit = PollingEngine.shutdown()
 }

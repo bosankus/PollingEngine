@@ -2,7 +2,7 @@ import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 
 plugins {
     alias(libs.plugins.kotlinMultiplatform)
-    alias(libs.plugins.androidLibrary)
+    alias(libs.plugins.androidKotlinMultiplatformLibrary)
     alias(libs.plugins.dokka)
     alias(libs.plugins.detekt)
     alias(libs.plugins.ktlint)
@@ -18,17 +18,31 @@ description = "PollingEngine KMP library providing robust polling with backoff a
 kotlin {
     explicitApi()
 
-    androidTarget {
+    android {
+        namespace = "in.androidplay.pollingengine"
+        compileSdk = libs.versions.android.compileSdk.get().toInt()
+        minSdk = libs.versions.android.minSdk.get().toInt()
+
         compilerOptions { jvmTarget.set(JvmTarget.JVM_11) }
+
+        optimization {
+            consumerKeepRules.apply {
+                publish = true
+                file("consumer-rules.pro")
+            }
+        }
     }
 
     // CocoaPods configuration for iOS consumption
     cocoapods {
         ios.deploymentTarget = "14.0"
-        summary = project.findProperty("pollingengine.summary") as String
-        homepage = project.findProperty("pollingengine.homepage") as String
-        extraSpecAttributes["license"] = project.findProperty("pollingengine.license") as String
-        extraSpecAttributes["authors"] = project.findProperty("pollingengine.authors") as String
+        summary = (project.findProperty("pollingengine.summary") as String?) ?: description.orEmpty()
+        homepage = (project.findProperty("pollingengine.homepage") as String?)
+            ?: "https://github.com/bosankus/PollingEngine"
+        extraSpecAttributes["license"] = (project.findProperty("pollingengine.license") as String?)
+            ?: "Apache-2.0"
+        extraSpecAttributes["authors"] = (project.findProperty("pollingengine.authors") as String?)
+            ?: "Ankush Bose"
 
         framework {
             baseName = "PollingEngine"
@@ -57,30 +71,8 @@ kotlin {
     }
 }
 
-android {
-    namespace = "in.androidplay.pollingengine"
-    compileSdk = libs.versions.android.compileSdk.get().toInt()
-
-    defaultConfig {
-        minSdk = libs.versions.android.minSdk.get().toInt()
-        consumerProguardFiles(
-            "consumer-rules.pro",
-        )
-    }
-
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-    buildTypes {
-        release {
-            isMinifyEnabled = true
-        }
-    }
-}
-
-// Dokka minimal task alias
-tasks.register("docs") { dependsOn(tasks.named("dokkaHtml")) }
+// Dokka minimal task alias (Dokka 2.x: the V1 `dokkaHtml` task is disabled)
+tasks.register("docs") { dependsOn(tasks.named("dokkaGenerate")) }
 
 // Detekt minimal config
 detekt {

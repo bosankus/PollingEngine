@@ -18,8 +18,10 @@ val signingEnabledGate: Boolean = run {
     (fromProp ?: fromEnv) == true
 }
 
-val hasInMemorySigning: Boolean = listOf("signing.key", "signing.password")
-    .all { prop(it)?.isNotBlank() == true }
+// In-memory signing: vanniktech reads signingInMemoryKey/KeyId/KeyPassword (used by CI).
+// Also accept the legacy "signing.key" name for backwards compatibility.
+val hasInMemorySigning: Boolean = listOf("signingInMemoryKey", "signing.key")
+    .any { prop(it)?.isNotBlank() == true }
 
 val hasSecretKeyRingSigning: Boolean = run {
     val keyRing = prop("signing.secretKeyRingFile")

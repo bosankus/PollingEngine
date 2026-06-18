@@ -1,9 +1,18 @@
 name: Publish SDK
 
+# Manual fallback publisher for Maven Central. The automated release (build + publish + GitHub
+# Release + docs) runs from release.yml on `v*` tags; trigger this only to (re)publish the current
+# version on demand. Auto-publishing on every push to main is intentionally avoided — Maven Central
+# rejects re-publishing an already-released version.
 on:
-  push:
-    branches:
-      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: publish-maven-central
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -18,11 +27,27 @@ jobs:
           java-version: '17'
 
       - name: Set up Gradle
-        uses: gradle/gradle-build-action@v3
+        uses: gradle/actions/setup-gradle@v4
 
-      - name: Publish Android SDK to Maven
-        run: ./gradlew :pollingengine:publish
+      - name: Cache Kotlin/Native (konan)
+        uses: actions/cache@v4
+        with:
+          path: ~/.konan
+          key: ${{ runner.os }}-konan-${{ hashFiles('**/gradle/libs.versions.toml', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-konan-
 
-      - name: Publish iOS SDK to CocoaPods
-        run: ./gradlew :pollingengine:publishToMavenLocal # or your iOS publishing command
-
+      # Publishes all KMP publications (Android + iOS + multiplatform metadata) to the
+      # Maven Central Portal in one step. publishToMavenCentral uploads to a staging
+      # deployment for manual release in the Portal; switch to publishAndReleaseToMavenCentral
+      # to auto-release. Credentials and the signing key are injected from repository secrets
+      # as Gradle project properties (ORG_GRADLE_PROJECT_*) — they are NOT stored in the repo.
+      - name: Publish to Maven Central
+        run: ./gradlew :pollingengine:publishToMavenCentral --no-daemon --stacktrace
+        env:
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          SIGNING_ENABLED: 'true'
+          ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
+          ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}

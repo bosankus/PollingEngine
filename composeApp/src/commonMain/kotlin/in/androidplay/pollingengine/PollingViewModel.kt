@@ -1,11 +1,10 @@
 package `in`.androidplay.pollingengine
 
 import `in`.androidplay.pollingengine.models.PollingResult
-import `in`.androidplay.pollingengine.polling.BackoffPolicy
 import `in`.androidplay.pollingengine.polling.Polling
 import `in`.androidplay.pollingengine.polling.PollingOutcome
-import `in`.androidplay.pollingengine.polling.PollingSession
-import `in`.androidplay.pollingengine.polling.RetryPredicates
+import `in`.androidplay.pollingengine.polling.dsl.PollHandle
+import `in`.androidplay.pollingengine.polling.dsl.Retry
 import kotlinx.atomicfu.atomic
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -19,6 +18,7 @@ import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlin.math.pow
 import kotlin.math.round
+import kotlin.time.Duration.Companion.milliseconds
 
 data class LogItem(val text: String, val id: Long)
 
@@ -65,14 +65,13 @@ class PollingViewModel {
     val uiState: StateFlow<PollingUiState> = _uiState.asStateFlow()
 
     private val viewModelScope = CoroutineScope(Dispatchers.Default)
-    private var pollingJob: Job? = null
     private var countdownJob: Job? = null
-    private var pollingSession: PollingSession? = null
+    private var pollHandle: PollHandle<String>? = null
 
     private val retryStrategies = listOf(
-        "Always" to RetryPredicates.always,
-        "Never" to RetryPredicates.never,
-        "Any timeout" to RetryPredicates.networkOrServerOrTimeout
+        "Always" to Retry.always,
+        "Never" to Retry.never,
+        "Any timeout" to Retry.networkOrServer
     )
 
     fun dispatch(intent: PollingIntent) {
@@ -122,129 +121,91 @@ class PollingViewModel {
             return
         }
 
-        val backoff = BackoffPolicy(
-            initialDelayMs = initialDelay,
-            maxDelayMs = maxDelay,
-            multiplier = multiplier,
-            jitterRatio = jitter,
-            maxAttempts = maxAttempts,
-            overallTimeoutMs = overallTimeout,
-            perAttemptTimeoutMs = perAttemptTimeout,
-        )
-
         _uiState.update {
             it.copy(
                 isRunning = true,
                 isPaused = false,
-                remainingMs = backoff.overallTimeoutMs
+                remainingMs = overallTimeout
             )
         }
 
         var attemptCounter = 0
 
-        // Capture active IDs before starting, to identify the new session after launch
-        viewModelScope.launch {
-            try {
-                val beforeIds = Polling.listActiveIds().toSet()
-
-                // Start and collect the polling flow
-                pollingJob = Polling.startPolling<String> {
-                    this.fetch = {
-                        attemptCounter++
-                        if (attemptCounter < 8) PollingResult.Waiting else PollingResult.Success("Ready at attempt #$attemptCounter")
-                    }
-                    this.isTerminalSuccess = { it.isNotEmpty() }
-                    this.backoff = backoff
-                    this.shouldRetryOnError =
-                        retryStrategies[_uiState.value.retryStrategyIndex].second
-                    this.onAttempt = { attempt, delayMs ->
-                        val baseDelay =
-                            (backoff.initialDelayMs * backoff.multiplier.pow((attempt - 1).toDouble())).toLong()
-                                .coerceAtMost(backoff.maxDelayMs)
-                        val baseSecs = ((baseDelay) / 100L).toFloat() / 10f
-                        val baseSecsStr = ((round(baseSecs * 10f)) / 10f).toString()
-                        val actualDelay = delayMs ?: 0L
-                        val actualSecs = (actualDelay / 100L).toFloat() / 10f
-                        val actualSecsStr = ((round(actualSecs * 10f)) / 10f).toString()
-                        addLog("[info] Attempt #$attempt (base: ${baseSecsStr}s, actual: ${actualSecsStr}s)")
-                    }
-                    this.onResult = { attempt, result ->
-                        addLog("[info] Result at #$attempt: ${describeResult(result)}")
-                    }
-                    this.onComplete = { attempts, durationMs, outcome ->
-                        val secs = (durationMs / 100L).toFloat() / 10f
-                        val secsStr = ((round(secs * 10f)) / 10f).toString()
-                        addLog(
-                            "[done] Completed after $attempts attempts in ${secsStr}s: ${
-                                describeOutcome(
-                                    outcome
-                                )
-                            }"
-                        )
-                    }
-                }.onEach { outcome ->
-                    addLog("[done] Final Outcome: ${describeOutcome(outcome)}")
-                    _uiState.update {
-                        it.copy(
-                            isRunning = false,
-                            isPaused = false,
-                            remainingMs = 0
-                        )
-                    }
-                    // Clear session on terminal outcome
-                    pollingSession = null
-                }.launchIn(this)
-
-                // Try to resolve the newly created session ID with a short retry window
-                var resolved: String? = null
-                repeat(10) { // ~ up to 500ms (10 * 50ms)
-                    val afterIds = Polling.listActiveIds().toSet()
-                    val diff = afterIds - beforeIds
-                    if (diff.isNotEmpty()) {
-                        resolved = diff.first()
-                        return@repeat
-                    }
-                    kotlinx.coroutines.delay(50)
-                }
-
-                if (resolved != null) {
-                    pollingSession = PollingSession(resolved)
-                    addLog("[info] Session started (id=${resolved})")
+        try {
+            // start() hands back a live handle immediately — no id-diffing needed.
+            val handle = Polling.pollResult<String> {
+                attemptCounter++
+                if (attemptCounter < 8) {
+                    PollingResult.Waiting
                 } else {
-                    // Fallback: if exactly one active, take it
-                    val active = Polling.listActiveIds()
-                    if (active.size == 1) {
-                        pollingSession = PollingSession(active.first())
-                        addLog("[info] Session started (id=${active.first()})")
-                    } else {
-                        addLog("[error] Could not determine session id; pause/resume may not work.")
-                    }
+                    PollingResult.Success("Ready at attempt #$attemptCounter")
                 }
-
-                // Start countdown after session likely established
-                startCountdown()
-            } catch (t: Throwable) {
-                addLog("[error] Failed to start polling: ${t.message}")
-                _uiState.update { it.copy(isRunning = false, isPaused = false) }
             }
+                .until { it.isNotEmpty() }
+                .retryWhen(retryStrategies[_uiState.value.retryStrategyIndex].second)
+                .backoff {
+                    this.initialDelay = initialDelay.milliseconds
+                    this.maxDelay = maxDelay.milliseconds
+                    this.multiplier = multiplier
+                    this.jitter = jitter
+                    this.maxAttempts = maxAttempts
+                    this.overallTimeout = overallTimeout.milliseconds
+                    this.perAttemptTimeout = perAttemptTimeout?.milliseconds
+                }
+                .onAttempt { attempt, delayMs ->
+                    val baseDelay =
+                        (initialDelay * multiplier.pow((attempt - 1).toDouble())).toLong()
+                            .coerceAtMost(maxDelay)
+                    val baseSecs = (baseDelay / 100L).toFloat() / 10f
+                    val baseSecsStr = ((round(baseSecs * 10f)) / 10f).toString()
+                    val actualDelay = delayMs ?: 0L
+                    val actualSecs = (actualDelay / 100L).toFloat() / 10f
+                    val actualSecsStr = ((round(actualSecs * 10f)) / 10f).toString()
+                    addLog("[info] Attempt #$attempt (base: ${baseSecsStr}s, actual: ${actualSecsStr}s)")
+                }
+                .onResult { attempt, result ->
+                    addLog("[info] Result at #$attempt: ${describeResult(result)}")
+                }
+                .onComplete { attempts, durationMs, outcome ->
+                    val secs = (durationMs / 100L).toFloat() / 10f
+                    val secsStr = ((round(secs * 10f)) / 10f).toString()
+                    addLog("[done] Completed after $attempts attempts in ${secsStr}s: ${describeOutcome(outcome)}")
+                }
+                .start(viewModelScope)
+
+            pollHandle = handle
+            addLog("[info] Session started (id=${handle.id})")
+
+            // React to the terminal outcome via the handle.
+            handle.outcomes.onEach { outcome ->
+                addLog("[done] Final Outcome: ${describeOutcome(outcome)}")
+                _uiState.update {
+                    it.copy(isRunning = false, isPaused = false, remainingMs = 0)
+                }
+                pollHandle = null
+            }.launchIn(viewModelScope)
+
+            startCountdown()
+        } catch (t: Throwable) {
+            addLog("[error] Failed to start polling: ${t.message}")
+            _uiState.update { it.copy(isRunning = false, isPaused = false) }
         }
     }
 
     private fun pauseOrResumePolling() {
         val isCurrentlyPaused = _uiState.value.isPaused
         _uiState.update { it.copy(isPaused = !isCurrentlyPaused) }
-        pollingSession?.let { session ->
+        pollHandle?.let { handle ->
             viewModelScope.launch {
-                if (!isCurrentlyPaused) Polling.pause(session.id) else Polling.resume(session.id)
+                if (!isCurrentlyPaused) handle.pause() else handle.resume()
             }
         }
     }
 
     private fun stopPolling() {
-        pollingSession?.let { session ->
-            viewModelScope.launch { Polling.cancel(session.id) }
+        pollHandle?.let { handle ->
+            viewModelScope.launch { handle.cancel() }
         }
-        pollingJob?.cancel()
         countdownJob?.cancel()
         _uiState.update {
             it.copy(
@@ -253,7 +214,7 @@ class PollingViewModel {
                 remainingMs = 0
             )
         }
-        pollingSession = null
+        pollHandle = null
     }
 
     private fun applyBackoffAtRuntime() {
@@ -272,25 +233,20 @@ class PollingViewModel {
             return
         }
 
-        val newPolicy = try {
-            BackoffPolicy(
-                initialDelayMs = initialDelay,
-                maxDelayMs = maxDelay,
-                multiplier = multiplier,
-                jitterRatio = jitter,
-                maxAttempts = maxAttempts,
-                overallTimeoutMs = overallTimeout,
-                perAttemptTimeoutMs = perAttemptTimeout,
-            )
-        } catch (t: Throwable) {
-            addLog("[error] ${t.message}")
-            return
-        }
-
-        pollingSession?.let { session ->
-            viewModelScope.launch {
-                Polling.updateBackoff(session.id, newPolicy)
+        pollHandle?.let { handle ->
+            try {
+                handle.retune {
+                    this.initialDelay = initialDelay.milliseconds
+                    this.maxDelay = maxDelay.milliseconds
+                    this.multiplier = multiplier
+                    this.jitter = jitter
+                    this.maxAttempts = maxAttempts
+                    this.overallTimeout = overallTimeout.milliseconds
+                    this.perAttemptTimeout = perAttemptTimeout?.milliseconds
+                }
                 addLog("[info] Applied new backoff policy at runtime.")
+            } catch (t: Throwable) {
+                addLog("[error] ${t.message}")
             }
         } ?: run {
             addLog("[error] Live update not available; stop and start with new settings.")

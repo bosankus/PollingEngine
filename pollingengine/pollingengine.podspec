@@ -1,6 +1,6 @@
 Pod::Spec.new do |spec|
     spec.name                     = 'pollingengine'
-    spec.version                  = '0.2.0'
+    spec.version                  = '1.0.0'
     spec.homepage                 = 'https://github.com/androidplay/PollingEngine'
     spec.source                   = { :http=> ''}
     spec.authors                  = ''

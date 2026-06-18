@@ -133,14 +133,14 @@ fun SharedObserveScreen() {
         item {
             DemoCard {
                 Text(
-                    "Polling.shared — one fetch / tick, many subscribers",
+                    "shared() — one fetch / tick, many subscribers",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,
                 )
                 Caption(
                     "A single upstream poll runs every ${state.intervalMs / 1000}s via " +
-                            "BackoffPolicies.fixed(). Both tiles below read from the SAME upstream " +
+                            "every(). Both tiles below read from the SAME upstream " +
                             "via stream(filter) — the fetch count proves exactly one network call per " +
                             "tick no matter how many subscribers are attached.",
                 )
@@ -213,7 +213,7 @@ fun SharedObserveScreen() {
         item {
             DemoCard {
                 Text(
-                    "Polling.observe — continuous value stream",
+                    "collect()/asFlow() — continuous value stream",
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                     color = MaterialTheme.colorScheme.primary,

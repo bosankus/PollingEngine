@@ -26,7 +26,7 @@ class PollingEngineCancellationTest {
             ),
         )
 
-        val outcome = Polling.run(config)
+        val outcome = PollingEngine.pollUntil(config)
         assertTrue(outcome is PollingOutcome.Exhausted, "Expected Exhausted outcome when CancellationException is thrown under active scope, but was: $outcome")
     }
 }

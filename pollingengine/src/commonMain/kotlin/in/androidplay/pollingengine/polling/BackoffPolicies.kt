@@ -3,7 +3,7 @@ package `in`.androidplay.pollingengine.polling
 /**
  * Factory Pattern: predefined BackoffPolicy configurations for common scenarios.
  */
-public object BackoffPolicies {
+internal object BackoffPolicies {
     /**
      * Quick polling tuned for short-lived availability (e.g., compliance status) with ~20s cap.
      */
@@ -21,12 +21,12 @@ public object BackoffPolicies {
      * Constant-cadence polling: one attempt every [intervalMs] with no growth and no jitter.
      *
      * By default the cadence is unbounded ([BackoffPolicy.UNLIMITED_ATTEMPTS] attempts and
-     * [BackoffPolicy.NO_TIMEOUT]) which is the natural fit for a long-lived observer — pair it
-     * with [Polling.observe] or [Polling.shared]. Supply [maxAttempts]/[overallTimeoutMs] to bound it.
+     * [BackoffPolicy.NO_TIMEOUT]) which is the natural fit for a long-lived observer. Supply
+     * [maxAttempts]/[overallTimeoutMs] to bound it.
      *
      * Example:
      * ```
-     * val tick = BackoffPolicies.fixed(intervalMs = 10_000) // poll every 10s, forever
+     * val tick = fixed(intervalMs = 10_000) // poll every 10s, forever
      * ```
      *
      * @param intervalMs spacing between attempts in milliseconds; must be > 0.

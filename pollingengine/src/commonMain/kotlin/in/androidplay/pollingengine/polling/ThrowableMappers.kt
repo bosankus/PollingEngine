@@ -9,17 +9,17 @@ import kotlinx.coroutines.TimeoutCancellationException
  * by avoiding direct references to platform-specific or optional libraries.
  *
  * Guidance:
- * - Use [RetryPredicates.networkOrServerOrTimeout] as a sensible default retry strategy.
+ * - Pair with `Retry.networkOrServer` as a sensible default retry strategy.
  * - Pick one of these mappers based on your environment to translate throwables into retry-friendly codes.
  */
-public object ThrowableMappers {
+internal object ThrowableMappers {
 
     /**
      * Default mapper for network-like environments.
      * - TimeoutCancellationException -> TIMEOUT_ERROR_CODE
      * - Otherwise -> NETWORK_ERROR
      */
-    public val networkDefault: (Throwable) -> Error = { t ->
+    val networkDefault: (Throwable) -> Error = { t ->
         val msg = t.message ?: (t::class.simpleName ?: "Throwable")
         when (t) {
             is TimeoutCancellationException -> Error(ErrorCodes.TIMEOUT_ERROR_CODE, msg)
@@ -30,14 +30,14 @@ public object ThrowableMappers {
     /**
      * iOS-friendly mapping. Kept equal to [networkDefault] in common code to avoid platform deps.
      */
-    public val iosDefault: (Throwable) -> Error = networkDefault
+    val iosDefault: (Throwable) -> Error = networkDefault
 
     /**
      * Mapper oriented for kotlinx.serialization failures without taking a hard dependency.
      * If the throwable simpleName contains "SerializationException", it is considered a server-side
      * (bad payload) error; otherwise UNKNOWN.
      */
-    public val kotlinxSerializationDefault: (Throwable) -> Error = { t ->
+    val kotlinxSerializationDefault: (Throwable) -> Error = { t ->
         val msg = t.message ?: (t::class.simpleName ?: "Throwable")
         val simple = t::class.simpleName ?: ""
         if (simple.contains("SerializationException")) {

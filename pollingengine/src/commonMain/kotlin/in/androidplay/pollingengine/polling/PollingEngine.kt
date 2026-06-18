@@ -11,11 +11,11 @@ import `in`.androidplay.pollingengine.polling.PollingEngine.observe
 import `in`.androidplay.pollingengine.polling.PollingEngine.pollUntil
 import `in`.androidplay.pollingengine.polling.PollingEngine.shared
 import kotlinx.coroutines.CancellationException
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.channels.awaitClose
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.ensureActive
 import kotlinx.coroutines.flow.Flow
@@ -24,14 +24,17 @@ import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.job
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
+import kotlin.coroutines.coroutineContext
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.TimeSource
 
@@ -48,7 +51,7 @@ internal object PollingEngine {
 
     internal enum class State { Running, Paused }
 
-    private data class Control(
+    internal data class Control(
         val id: String,
         val state: kotlinx.coroutines.flow.MutableStateFlow<State> = kotlinx.coroutines.flow.MutableStateFlow(
             State.Running
@@ -58,39 +61,38 @@ internal object PollingEngine {
         ),
     )
 
-    internal data class Handle(internal val id: String)
+    /**
+     * Live control surface for a launched poll, returned by [launch]. Wraps the underlying [Job]
+     * and the loop's [Control] so a caller can pause/resume/cancel/retune **without** going through
+     * the id registry — eliminating the need to resolve a session id after starting.
+     */
+    internal class EngineSession<T>(
+        val id: String,
+        private val job: Job,
+        private val control: Control,
+        /** Emits the single terminal [PollingOutcome] once the loop finishes, then completes. */
+        val outcomes: Flow<PollingOutcome<T>>,
+    ) {
+        val isActive: Boolean get() = job.isActive
+        val isPaused: Boolean get() = control.state.value == State.Paused
+
+        fun pause() { control.state.value = State.Paused }
+        fun resume() { control.state.value = State.Running }
+        fun cancel() { job.cancel(CancellationException("Cancelled by user")) }
+        fun retune(policy: BackoffPolicy) { control.backoff.value = policy }
+    }
 
     private var supervisor: Job = SupervisorJob()
     private var scope: CoroutineScope = CoroutineScope(supervisor + Dispatchers.Default)
     private val mutex = Mutex()
     private val active: MutableMap<String, Job> = mutableMapOf()
     private val controls: MutableMap<String, Control> = mutableMapOf()
-    private val sharedSessions: MutableMap<Any, SharedPollingSession<*>> = mutableMapOf()
+    private val sharedSessions: MutableMap<Any, SharedPoll<*>> = mutableMapOf()
     private var isShutdown: Boolean = false
 
     fun activePollsCount(): Int = active.size
 
     suspend fun listActiveIds(): List<String> = mutex.withLock { active.keys.toList() }
-
-    suspend fun cancel(id: String) {
-        mutex.withLock { active[id]?.cancel(CancellationException("Cancelled by user")) }
-    }
-
-    suspend fun pause(id: String) {
-        mutex.withLock { controls[id]?.state?.value = State.Paused }
-    }
-
-    suspend fun resume(id: String) {
-        mutex.withLock { controls[id]?.state?.value = State.Running }
-    }
-
-    suspend fun updateBackoff(id: String, newPolicy: BackoffPolicy) {
-        mutex.withLock { controls[id]?.backoff?.value = newPolicy }
-    }
-
-    suspend fun cancel(handle: Handle) {
-        cancel(handle.id)
-    }
 
     /** Cancels all active polls and clears the registry. */
     suspend fun cancelAll() {
@@ -110,17 +112,36 @@ internal object PollingEngine {
         supervisor.cancel(CancellationException("PollingEngine shutdown"))
     }
 
-    fun <T> startPolling(
-        config: PollingConfig<T>
-    ): Flow<PollingOutcome<T>> = channelFlow {
+    /**
+     * Launches a poll into the caller's [scope] and returns an [EngineSession] **synchronously** —
+     * the id and control surface exist before the loop runs, so callers never have to resolve a
+     * session id after starting. When [onValue] is supplied the loop streams every success value to
+     * it (observe mode); otherwise it converges silently. Either way [EngineSession.outcomes] emits
+     * the single terminal [PollingOutcome] when the loop ends.
+     */
+    fun <T> launch(
+        scope: CoroutineScope,
+        config: PollingConfig<T>,
+        onValue: (suspend (T) -> Unit)? = null,
+    ): EngineSession<T> {
         if (isShutdown) throw IllegalStateException("PollingEngine is shut down")
         val id = generateId()
         val control = Control(id)
+        val deferred = CompletableDeferred<PollingOutcome<T>>()
         val job = scope.launch(config.dispatcher) {
-            val outcome = pollUntil(config, control)
             try {
-                send(outcome)
-                close()
+                mutex.withLock {
+                    active[id] = coroutineContext.job
+                    controls[id] = control
+                }
+                val outcome = runLoop(config, control) { value -> onValue?.invoke(value) }
+                deferred.complete(outcome)
+            } catch (ce: CancellationException) {
+                deferred.cancel(ce)
+                throw ce
+            } catch (t: Throwable) {
+                deferred.completeExceptionally(t)
+                throw t
             } finally {
                 mutex.withLock {
                     active.remove(id)
@@ -128,13 +149,8 @@ internal object PollingEngine {
                 }
             }
         }
-        mutex.withLock {
-            active[id] = job
-            controls[id] = control
-        }
-        awaitClose {
-            job.cancel()
-        }
+        val outcomes: Flow<PollingOutcome<T>> = flow { emit(deferred.await()) }
+        return EngineSession(id, job, control, outcomes)
     }
 
     /**
@@ -162,13 +178,13 @@ internal object PollingEngine {
         config: PollingConfig<T>,
         stopTimeoutMs: Long,
         replay: Int,
-    ): SharedPollingSession<T> {
+    ): SharedPoll<T> {
         if (isShutdown) throw IllegalStateException("PollingEngine is shut down")
         return mutex.withLock {
             @Suppress("UNCHECKED_CAST")
             sharedSessions.getOrPut(key) {
                 SharedSessionImpl(key, observe(config), scope, stopTimeoutMs, replay)
-            } as SharedPollingSession<T>
+            } as SharedPoll<T>
         }
     }
 
@@ -368,7 +384,7 @@ internal object PollingEngine {
     }
 
     /**
-     * [SharedPollingSession] backed by a single [shareIn]'d upstream, giving one [PollingConfig.fetch]
+     * [SharedPoll] backed by a single [shareIn]'d upstream, giving one [PollingConfig.fetch]
      * per tick regardless of subscriber count, with WhileSubscribed start/stop semantics.
      */
     private class SharedSessionImpl<T>(
@@ -377,7 +393,7 @@ internal object PollingEngine {
         scope: CoroutineScope,
         stopTimeoutMs: Long,
         replay: Int,
-    ) : SharedPollingSession<T> {
+    ) : SharedPoll<T> {
         private val shared: SharedFlow<T> = upstream.shareIn(
             scope = scope,
             started = SharingStarted.WhileSubscribed(

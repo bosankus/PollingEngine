@@ -43,7 +43,7 @@ class PollingStreamingTest {
             dispatcher = StandardTestDispatcher(testScheduler),
         )
 
-        val outcome = Polling.run(config)
+        val outcome = PollingEngine.pollUntil(config)
         assertTrue(outcome is PollingOutcome.Success, "expected Success but was $outcome")
         assertEquals(50, outcome.attempts)
     }
@@ -60,7 +60,7 @@ class PollingStreamingTest {
             onAttempt = { _, delayMs -> announced.add(delayMs) },
         )
 
-        val outcome = Polling.run(config)
+        val outcome = PollingEngine.pollUntil(config)
         assertTrue(outcome is PollingOutcome.Exhausted, "expected Exhausted but was $outcome")
         assertEquals(0L, announced.first(), "first attempt should be immediate")
         val cadence = announced.drop(1)
@@ -72,14 +72,16 @@ class PollingStreamingTest {
     @Test
     fun f3_observe_emitsEverySuccessTick() = runTest {
         var n = 0
-        val values = Polling.observe<Int> {
+        val config = PollingConfig(
             fetch = {
                 n++
                 Success(n)
-            }
-            backoff = unboundedNoDelay()
-            dispatcher = StandardTestDispatcher(testScheduler)
-        }.take(5).toList()
+            },
+            isTerminalSuccess = { false },
+            backoff = unboundedNoDelay(),
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val values = PollingEngine.observe(config).take(5).toList()
 
         assertEquals(listOf(1, 2, 3, 4, 5), values)
     }
@@ -88,15 +90,17 @@ class PollingStreamingTest {
     @Test
     fun f4_observe_stopsOnEmptyWithoutEmitting() = runTest {
         var tick = 0
-        val values = Polling.observe<List<Int>> {
+        val config = PollingConfig<List<Int>>(
             fetch = {
                 tick++
                 if (tick <= 2) Success(listOf(tick)) else Success(emptyList())
-            }
-            stopWhen = { it is Success && it.data.isEmpty() }
-            backoff = unboundedNoDelay()
-            dispatcher = StandardTestDispatcher(testScheduler)
-        }.toList()
+            },
+            isTerminalSuccess = { false },
+            stopWhen = { it is Success && it.data.isEmpty() },
+            backoff = unboundedNoDelay(),
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val values = PollingEngine.observe(config).toList()
 
         assertEquals(listOf(listOf(1), listOf(2)), values)
     }
@@ -123,7 +127,7 @@ class PollingStreamingTest {
             stopWhen = { it is Success && it.data.isEmpty() },
         )
 
-        val outcome = Polling.run(config)
+        val outcome = PollingEngine.pollUntil(config)
         assertTrue(outcome is PollingOutcome.Exhausted, "expected Exhausted but was $outcome")
         val last = outcome.last
         assertTrue(
@@ -137,11 +141,12 @@ class PollingStreamingTest {
     fun f5_shared_singleFetchPerTick_distinctFilters() = runTest {
         PollingEngine.installScopeForTesting(backgroundScope)
         var fetches = 0
-        val session = Polling.shared<Int>(key = "f5") {
+        val config = PollingConfig(
             fetch = {
                 fetches++
                 Success(fetches)
-            }
+            },
+            isTerminalSuccess = { false },
             backoff = BackoffPolicy(
                 initialDelayMs = 10,
                 maxDelayMs = 10,
@@ -149,10 +154,10 @@ class PollingStreamingTest {
                 jitterRatio = 0.0,
                 maxAttempts = BackoffPolicy.UNLIMITED_ATTEMPTS,
                 overallTimeoutMs = BackoffPolicy.NO_TIMEOUT,
-            )
-            dispatcher = StandardTestDispatcher(testScheduler)
-            replay = 0
-        }
+            ),
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val session = PollingEngine.shared(key = "f5", config = config, stopTimeoutMs = 0, replay = 0)
 
         val all = async { session.stream().take(3).toList() }
         val even = async { session.stream { it % 2 == 0 }.take(2).toList() }
@@ -175,11 +180,12 @@ class PollingStreamingTest {
     fun f6_shared_startsOnSubscribe_stopsAfterGrace() = runTest {
         PollingEngine.installScopeForTesting(backgroundScope)
         var fetches = 0
-        val session = Polling.shared<Int>(key = "f6") {
+        val config = PollingConfig(
             fetch = {
                 fetches++
                 Success(fetches)
-            }
+            },
+            isTerminalSuccess = { false },
             backoff = BackoffPolicy(
                 initialDelayMs = 100,
                 maxDelayMs = 100,
@@ -187,11 +193,11 @@ class PollingStreamingTest {
                 jitterRatio = 0.0,
                 maxAttempts = BackoffPolicy.UNLIMITED_ATTEMPTS,
                 overallTimeoutMs = BackoffPolicy.NO_TIMEOUT,
-            )
-            dispatcher = StandardTestDispatcher(testScheduler)
-            stopTimeoutMs = 500
-            replay = 0
-        }
+            ),
+            dispatcher = StandardTestDispatcher(testScheduler),
+        )
+        val session =
+            PollingEngine.shared(key = "f6", config = config, stopTimeoutMs = 500, replay = 0)
 
         // No subscriber yet -> no polling has started.
         assertEquals(0, fetches)

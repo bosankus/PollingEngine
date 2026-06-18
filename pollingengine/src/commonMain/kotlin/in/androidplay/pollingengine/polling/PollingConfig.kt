@@ -8,7 +8,7 @@ import kotlinx.coroutines.Dispatchers
 /**
  * Configuration for the polling engine.
  */
-public data class PollingConfig<T>(
+internal data class PollingConfig<T>(
     val fetch: suspend () -> PollingResult<T>,
     val isTerminalSuccess: (T) -> Boolean,
     val shouldRetryOnError: (Error?) -> Boolean = { true },
@@ -25,15 +25,11 @@ public data class PollingConfig<T>(
     },
     /**
      * Optional non-success terminal predicate. When it returns true for a poll result,
-     * polling ends immediately *without* a [PollingOutcome.Success] — the converge APIs
-     * ([Polling.run]/[Polling.startPolling]) report [PollingOutcome.Exhausted] carrying that
-     * result, and the streaming APIs ([Polling.observe]/[Polling.shared]) simply complete.
+     * polling ends immediately *without* a [PollingOutcome.Success]: converge runs report
+     * [PollingOutcome.Exhausted] carrying that result, and streaming runs simply complete.
      * Distinct from [isTerminalSuccess]; defaults to never stopping.
      *
-     * Example: stop a list observer once the remote list drains.
-     * ```
-     * stopWhen = { it is PollingResult.Success && it.data.isEmpty() }
-     * ```
+     * Surfaced publicly via `PollBuilder.stopWhen` / `PollBuilder.stopWhenResult`.
      */
     val stopWhen: (PollingResult<T>) -> Boolean = { false },
 )

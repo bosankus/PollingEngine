@@ -8,15 +8,24 @@ Last updated: 2026-06-19
 [![CI](https://img.shields.io/badge/CI-GitHub%20Actions-inactive.svg)](#setupbuild-instructions)
 
 A Kotlin Multiplatform library for Android and iOS that provides a production‑ready polling engine
-with:
+behind a **fluent API that reads like a sentence**:
 
-- Exponential backoff and jitter, plus a fixed‑interval preset
-- Timeouts (overall and per‑attempt) and bounded **or unbounded** runs
-- Three execution models: **converge** (`startPolling`/`run`), **continuous stream** (`observe`),
-  and
-  **multiplexed shared sessions** (`shared`)
-- Control APIs: pause, resume, cancel, cancel‑all, update backoff, shutdown
-- Observability hooks (attempt/result/complete) and domain‑level results
+```kotlin
+// "Poll the status until it's COMPLETED, every 2 seconds."
+Polling.poll { api.checkStatus() }
+    .until { it == "COMPLETED" }
+    .every(2.seconds)
+    .start(scope)
+```
+
+You describe the poll, then end with a verb that picks how it runs. Features:
+
+- Exponential backoff and jitter (`.backoff { … }`) or a fixed cadence (`.every(2.seconds)`)
+- Timeouts (`.timeout`, `.timeoutPerAttempt`) and attempt caps (`.atMost`), bounded **or unbounded**
+- Four run models chosen by the terminal verb: **converge** (`.start`/`.await`),
+  **continuous stream** (`.collect`/`.asFlow`), and **multiplexed shared sessions** (`.shared`)
+- A live `PollHandle` from `.start()` for `pause` / `resume` / `cancel` / `retune` — no id lookups
+- Observability hooks (`.onAttempt` / `.onResult` / `.onComplete`) and domain‑level results
 
 ```mermaid
 flowchart TD
@@ -30,7 +39,7 @@ flowchart TD
     G -->|Yes| B
     G -->|No / unlimited| E
     %% External control
-    B -. pause/resume/cancel/updateBackoff .-> H[Control APIs]
+    B -. pause/resume/cancel/retune .-> H[PollHandle]
 ```
 
 Modules:
@@ -42,11 +51,12 @@ Modules:
 ## Table of Contents
 
 - [Project Overview](#project-overview)
-- [What's New in 0.2.0](#whats-new-in-020)
+- [The Fluent API in 60 seconds](#the-fluent-api-in-60-seconds)
 - [Core Concepts](#core-concepts)
 - [Public API Reference](#public-api-reference)
 - [Installation and Dependency](#installation-and-dependency)
 - [Android Implementation](#android-implementation)
+- [Migration from 0.2.x](#migration-from-02x)
 - [iOS (Swift) Implementation](#ios-swift-implementation)
 - [Backoff & Retry Reference](#backoff--retry-reference)
 - [Setup/Build Instructions](#setupbuild-instructions)
@@ -63,84 +73,104 @@ waiting for a server job to complete, checking payment/compliance status, or str
 
 Platforms: Kotlin Multiplatform (common code) with Android and iOS targets.
 
-> **API entry point:** use the facade object `Polling` (which implements the `PollingApi`
-> interface).
-> Do not reference `PollingEngine` directly — it is internal.
+> **API entry point:** everything starts at the `Polling` facade object — call `Polling.poll { … }`
+> (or `Polling.pollResult { … }`) and chain from there. The internal engine and config types are
+> not part of the public surface.
 
-## What's New in 0.2.0
+## The Fluent API in 60 seconds
 
-All additions are backward compatible — existing `startPolling`/`run`/`compose`, `PollingConfig`,
-`BackoffPolicy`, and `PollingOutcome` behavior is unchanged.
+Every poll is built the same way: **`Polling.poll { fetch }`**, optional refinements, then a
+**terminal verb** that decides what you get back.
 
-| Feature                         | API                                                                             | Summary                                                                                                                         |
-|---------------------------------|---------------------------------------------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------|
-| **Unbounded polling**           | `maxAttempts = 0` (`UNLIMITED_ATTEMPTS`), `overallTimeoutMs = 0` (`NO_TIMEOUT`) | `0` now means "no limit"; check via `isAttemptsUnlimited` / `isOverallTimeoutDisabled`. Defaults unchanged (8 attempts / 120s). |
-| **Fixed‑interval preset**       | `BackoffPolicies.fixed(intervalMs, …)`                                          | Constant cadence, no growth, no jitter; unbounded by default.                                                                   |
-| **Continuous streaming**        | `Polling.observe { } : Flow<T>`                                                 | Emits every successful tick value instead of converging to one outcome.                                                         |
-| **Stop predicate**              | `stopWhen = { … }`                                                              | Ends polling on a non‑success terminal (e.g. empty list).                                                                       |
-| **Multiplexed sessions**        | `Polling.shared(key) { } : SharedPollingSession<T>`                             | One poll loop per key (one `fetch()` per tick) fanned out to many subscribers via `stream()` / `stream(filter)`.                |
-| **Subscriber‑driven lifecycle** | builder `stopTimeoutMs`, `replay`                                               | Start on first subscriber; keep alive a grace period after the last leaves; replay recent values to late subscribers.           |
+```kotlin
+import `in`.androidplay.pollingengine.polling.Polling
+import `in`.androidplay.pollingengine.polling.dsl.Retry
+import kotlin.time.Duration.Companion.seconds
 
-> Note: `Polling.shared` is a `suspend` function (registry access is mutex‑guarded for multiplatform
-> thread‑safety).
+// Converge → a controllable handle
+val handle = Polling.poll { api.checkStatus() }   // suspend () -> T ; just throw on error
+    .until { it == "COMPLETED" }                  // terminal success condition
+    .every(2.seconds)                             // cadence (or .backoff { … } for exponential)
+    .retryWhen(Retry.networkOrServer)             // optional
+    .start(scope)                                 // ← verb: launch + return PollHandle
+
+handle.pause(); handle.resume(); handle.cancel()  // control, no id lookups
+```
+
+| Terminal verb | You get | Use it for |
+|---|---|---|
+| `.start(scope)` | `PollHandle<T>` (control + `outcomes` flow) | fire‑and‑control a converging poll |
+| `.await()` | `PollingOutcome<T>` (suspends) | a one‑shot poll inside a coroutine |
+| `.collect(scope) { v -> }` | `PollHandle<T>` | react to **every** successful value |
+| `.asFlow()` | `Flow<T>` | a cold stream for Compose `collectAsState` |
+| `.shared(key)` | `SharedPoll<T>` | one loop fanned out to many subscribers |
+
+Refinements (all optional, sane defaults): `.until` · `.stopWhen` · `.every` · `.backoff { }` ·
+`.atMost` · `.timeout` · `.timeoutPerAttempt` · `.retryWhen` · `.mapErrors` · `.on(dispatcher)` ·
+`.onAttempt` · `.onResult` · `.onComplete` · `.keepAliveFor` · `.replayLast`.
+
+> Coming from 0.2.x? See the [Migration from 0.2.x](#migration-from-02x) map below.
 
 ## Core Concepts
 
-**`PollingResult<T>`** — what your `fetch` returns each tick:
+**Your `fetch`** — the most common form is `Polling.poll { … }`, where the lambda returns a plain
+value (`T`) and **throws** on error; the engine wraps it and runs throwables through your retry
+policy. If you need to say "no value yet, keep polling" without a value, use
+`Polling.pollResult { … }` and return a `PollingResult<T>`:
 
-| Variant                                             | Meaning                                                                  |
-|-----------------------------------------------------|--------------------------------------------------------------------------|
-| `PollingResult.Success(data)`                       | A value was retrieved; checked against `isTerminalSuccess` / `stopWhen`. |
-| `PollingResult.Failure(error)`                      | Failed this tick; retried if `shouldRetryOnError(error)` is true.        |
-| `PollingResult.Waiting`                             | Not ready yet; keep polling.                                             |
-| `PollingResult.Cancelled` / `PollingResult.Unknown` | Cancelled / indeterminate state.                                         |
+| `PollingResult` variant       | Meaning                                                            |
+|-------------------------------|-------------------------------------------------------------------|
+| `PollingResult.Success(data)` | A value was retrieved; checked against `.until` / `.stopWhen`.    |
+| `PollingResult.Failure(error)`| Failed this tick; retried if `.retryWhen(error)` is true.         |
+| `PollingResult.Waiting`       | Not ready yet; keep polling.                                      |
+| `PollingResult.Cancelled` / `PollingResult.Unknown` | Cancelled / indeterminate state.            |
 
-**`PollingOutcome<T>`** — the terminal result of a *converge* run (`startPolling`/`run`/`compose`):
+**`PollingOutcome<T>`** — the terminal result of a *converge* run (`.start` / `.await` /
+`Polling.sequence`):
 
 | Variant                    | Fields                                                            |
 |----------------------------|-------------------------------------------------------------------|
 | `PollingOutcome.Success`   | `value`, `attempts`, `elapsedMs`                                  |
-| `PollingOutcome.Exhausted` | `last`, `attempts`, `elapsedMs` (also used when `stopWhen` fires) |
+| `PollingOutcome.Exhausted` | `last`, `attempts`, `elapsedMs` (also used when `.stopWhen` fires)|
 | `PollingOutcome.Timeout`   | `last`, `attempts`, `elapsedMs`                                   |
 | `PollingOutcome.Cancelled` | `attempts`, `elapsedMs`                                           |
 
-**Execution models:**
+**Run models** (chosen by the terminal verb):
 
-- **Converge** — `Polling.startPolling { } : Flow<PollingOutcome<T>>` (or `Polling.run { }`
-  suspending)
-  polls until terminal success, exhaustion, timeout, or cancellation, then emits one
-  `PollingOutcome`.
-- **Observe** — `Polling.observe { } : Flow<T>` emits the value of *every* successful tick and keeps
-  running until a stop condition (terminal success, `stopWhen`, non‑retryable failure, or limits).
-- **Shared** — `Polling.shared(key) { } : SharedPollingSession<T>` runs one loop per key and fans
-  each
-  tick value out to all `stream()` subscribers with a single `fetch()` per tick.
+- **Converge** — `.start(scope)` returns a `PollHandle` whose `outcomes` flow emits one
+  `PollingOutcome`; `.await()` suspends and returns it directly. Polls until terminal success,
+  exhaustion, timeout, or cancellation.
+- **Observe** — `.collect(scope) { value -> }` (callback) or `.asFlow()` (cold `Flow<T>`) emit the
+  value of *every* successful tick and keep running until a stop condition (`.until`, `.stopWhen`,
+  a non‑retryable failure, or limits).
+- **Shared** — `.shared(key)` returns a `SharedPoll<T>`: one loop per key fans each tick value out
+  to all `stream()` subscribers with a single fetch per tick.
 
 ## Public API Reference
 
-The `Polling` facade (`PollingApi`):
+The `Polling` facade:
 
-| Member             | Signature                                               | Notes                                       |
-|--------------------|---------------------------------------------------------|---------------------------------------------|
-| `startPolling`     | `(config) / { builder } -> Flow<PollingOutcome<T>>`     | Converge mode.                              |
-| `observe`          | `{ builder } -> Flow<T>`                                | Continuous stream of success values.        |
-| `shared`           | `suspend (key, { builder }) -> SharedPollingSession<T>` | Multiplexed session per key.                |
-| `run`              | `suspend (config) -> PollingOutcome<T>`                 | One‑shot converge, suspending.              |
-| `compose`          | `suspend (vararg configs) -> PollingOutcome<T>`         | Run configs sequentially.                   |
-| `pause` / `resume` | `suspend (id)`                                          | Pause/resume a running session by id.       |
-| `cancel`           | `suspend (id) / (session)`                              | Cancel a session.                           |
-| `cancelAll`        | `suspend ()`                                            | Cancel every active session.                |
-| `updateBackoff`    | `suspend (id, newPolicy)`                               | Hot‑swap backoff on a running session.      |
-| `shutdown`         | `suspend ()`                                            | Stop the engine; no new sessions afterward. |
-| `activePollsCount` | `() -> Int`                                             | Number of active sessions.                  |
-| `listActiveIds`    | `suspend () -> List<String>`                            | IDs of active sessions.                     |
+| Member         | Signature                                          | Notes                                  |
+|----------------|----------------------------------------------------|----------------------------------------|
+| `poll`         | `{ suspend () -> T } -> PollBuilder<T>`            | Start a poll; fetch returns a value.   |
+| `pollResult`   | `{ suspend () -> PollingResult<T> } -> PollBuilder<T>` | Advanced: full result vocabulary.  |
+| `sequence`     | `suspend (vararg PollBuilder<T>) -> PollingOutcome<T>` | Run polls in order, stop at first non‑success. |
+| `cancelAll`    | `suspend ()`                                        | Cancel every active poll.              |
+| `shutdown`     | `suspend ()`                                        | Stop the engine; no new polls after.   |
+| `activeCount`  | `Int`                                               | Number of active polls (diagnostics).  |
+| `activeIds`    | `suspend () -> List<String>`                        | Ids of active polls (diagnostics).     |
 
-`SharedPollingSession<T>`: `val key`, `fun stream(): Flow<T>`,
-`fun stream(filter: (T) -> Boolean): Flow<T>`.
+`PollBuilder<T>` — refinements `.until` · `.stopWhen` · `.stopWhenResult` · `.every` · `.backoff { }`
+· `.atMost` · `.timeout` · `.timeoutPerAttempt` · `.retryWhen` · `.mapErrors` · `.on` · `.onAttempt`
+· `.onResult` · `.onComplete` · `.keepAliveFor` · `.replayLast`; terminal verbs `.start(scope)` ·
+`.await()` · `.collect(scope) { }` · `.asFlow()` · `.shared(key)`.
 
-`PollingConfigBuilder<T>` fields: `fetch` (required), `isTerminalSuccess` (required for converge),
-`shouldRetryOnError`, `backoff`, `dispatcher`, `onAttempt`, `onResult`, `onComplete`,
-`throwableMapper`, `stopWhen`, and streaming‑only `stopTimeoutMs`, `replay`.
+`PollHandle<T>`: `val id`, `val outcomes: Flow<PollingOutcome<T>>`, `val isActive`, `val isPaused`,
+`suspend pause()/resume()/cancel()`, `retune { … }`.
+
+`SharedPoll<T>`: `val key`, `fun stream(): Flow<T>`, `fun stream(filter: (T) -> Boolean): Flow<T>`.
+
+`Retry` presets (for `.retryWhen`): `Retry.always`, `Retry.never`, `Retry.networkOrServer`.
 
 ## Installation and Dependency
 
@@ -148,20 +178,20 @@ Coordinates on Maven Central:
 
 - groupId: `in.androidplay`
 - artifactId: `pollingengine`
-- version: `0.2.0`
+- version: `1.0.0`
 
 Gradle Kotlin DSL (Android/shared):
 
 ```kotlin
 repositories { mavenCentral() }
-dependencies { implementation("in.androidplay:pollingengine:0.2.0") }
+dependencies { implementation("in.androidplay:pollingengine:1.0.0") }
 ```
 
 Gradle Groovy DSL:
 
 ```groovy
 repositories { mavenCentral() }
-dependencies { implementation "in.androidplay:pollingengine:0.2.0" }
+dependencies { implementation "in.androidplay:pollingengine:1.0.0" }
 ```
 
 Maven:
@@ -170,7 +200,7 @@ Maven:
 <dependency>
   <groupId>in.androidplay</groupId>
   <artifactId>pollingengine</artifactId>
-  <version>0.2.0</version>
+  <version>1.0.0</version>
 </dependency>
 ```
 
@@ -207,13 +237,16 @@ patterns cover most needs.
 
 ### 1. Converge: poll until a job completes
 
-`startPolling` returns a `Flow<PollingOutcome<T>>`. Collect it in a `Job` you can cancel; this is
-the
-simplest way to control a one‑off poll.
+Describe the poll and end with `.start(viewModelScope)`. You get a `PollHandle` back immediately —
+collect its `outcomes` for the result, and use it directly to pause/resume/cancel.
 
 ```kotlin
-import `in`.androidplay.pollingengine.models.PollingResult
-import `in`.androidplay.pollingengine.polling.*
+import `in`.androidplay.pollingengine.polling.Polling
+import `in`.androidplay.pollingengine.polling.PollingOutcome
+import `in`.androidplay.pollingengine.polling.dsl.PollHandle
+import `in`.androidplay.pollingengine.polling.dsl.Retry
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.Duration.Companion.milliseconds
 
 class JobStatusViewModel(
     private val api: JobApi,
@@ -223,51 +256,45 @@ class JobStatusViewModel(
     private val _uiState = MutableStateFlow<JobUiState>(JobUiState.Idle)
     val uiState: StateFlow<JobUiState> = _uiState.asStateFlow()
 
-    private var pollingJob: Job? = null
+    private var handle: PollHandle<String>? = null
 
     fun startPolling() {
-        if (pollingJob != null) return
+        if (handle != null) return
         _uiState.value = JobUiState.Loading
 
-        pollingJob = viewModelScope.launch {
-            Polling.startPolling<String> {
-                fetch = {
-                    // Map your network call into a PollingResult
-                    runCatching { api.checkStatus(jobId) }
-                        .map { PollingResult.Success(it) }
-                        .getOrElse { PollingResult.Failure(Error(-1, it.message)) }
-                }
-                isTerminalSuccess = { it.equals("COMPLETED", ignoreCase = true) }
-                shouldRetryOnError = RetryPredicates.networkOrServerOrTimeout
-                throwableMapper = ThrowableMappers.networkDefault
-                backoff = BackoffPolicy(
-                    initialDelayMs = 1_000,
-                    maxDelayMs = 10_000,
-                    multiplier = 1.5,
-                    maxAttempts = 10,
-                    overallTimeoutMs = 120_000,
-                )
-                onAttempt = { attempt, delayMs -> Log.d("Poll", "attempt #$attempt, next in $delayMs ms") }
-            }.collect { outcome ->
+        val poll = Polling.poll { api.checkStatus(jobId) }   // just throw on error
+            .until { it.equals("COMPLETED", ignoreCase = true) }
+            .retryWhen(Retry.networkOrServer)
+            .backoff {
+                initialDelay = 1.seconds
+                maxDelay = 10.seconds
+                multiplier = 1.5
+            }
+            .atMost(10)
+            .timeout(2.minutes)
+            .onAttempt { attempt, delayMs -> Log.d("Poll", "attempt #$attempt, next in $delayMs ms") }
+            .start(viewModelScope)
+        handle = poll
+
+        viewModelScope.launch {
+            poll.outcomes.collect { outcome ->
                 _uiState.value = when (outcome) {
                     is PollingOutcome.Success   -> JobUiState.Success(outcome.value)
                     is PollingOutcome.Exhausted -> JobUiState.Error("Exhausted after ${outcome.attempts} attempts")
                     is PollingOutcome.Timeout   -> JobUiState.Error("Timed out after ${outcome.elapsedMs} ms")
                     is PollingOutcome.Cancelled -> JobUiState.Idle
                 }
+                handle = null
             }
-            pollingJob = null
         }
     }
 
-    fun cancelPolling() {
-        pollingJob?.cancel()
-        pollingJob = null
-    }
+    fun pause() = viewModelScope.launch { handle?.pause() }
+    fun resume() = viewModelScope.launch { handle?.resume() }
 
-    override fun onCleared() {
-        super.onCleared()
-        cancelPolling()
+    fun cancelPolling() {
+        viewModelScope.launch { handle?.cancel() }
+        handle = null
     }
 }
 
@@ -279,41 +306,49 @@ sealed interface JobUiState {
 }
 ```
 
-For a single suspending call without a Flow, use `Polling.run(config)` which returns the
-`PollingOutcome` directly.
+For a one‑shot poll inside a coroutine, drop the handle entirely and use `.await()`:
+
+```kotlin
+val outcome = Polling.poll { api.checkStatus(jobId) }
+    .until { it == "COMPLETED" }
+    .every(2.seconds)
+    .await()
+```
 
 ### 2. Observe: a continuous live stream
 
-`observe` emits every successful tick and auto‑completes when `stopWhen` (or a terminal/limit)
-fires.
-Pair it with `BackoffPolicies.fixed` for a steady cadence.
+`.collect(scope) { }` reacts to every successful tick and stops when `.stopWhen` (or a
+terminal/limit) fires. Pair it with `.every(…)` for a steady cadence.
 
 ```kotlin
-val running = viewModelScope.launch {
-    Polling.observe<Int> {
-        fetch = { PollingResult.Success(api.currentQueuePosition()) }
-        backoff = BackoffPolicies.fixed(intervalMs = 2_000) // one tick / 2s, forever
-        stopWhen = { it is PollingResult.Success && it.data == 0 } // stop when we reach the front
-    }.collect { position ->
+Polling.poll { api.currentQueuePosition() }
+    .every(2.seconds)               // one tick / 2s, forever
+    .stopWhen { it == 0 }           // stop when we reach the front
+    .collect(viewModelScope) { position ->
         _uiState.update { it.copy(queuePosition = position) }
     }
-}
-// running.cancel() to stop early
+```
+
+For Compose, `.asFlow()` gives a cold `Flow<T>` you can `collectAsState`:
+
+```kotlin
+val position by remember {
+    Polling.poll { api.currentQueuePosition() }.every(2.seconds).asFlow()
+}.collectAsState(initial = null)
 ```
 
 ### 3. Shared: one network call, many subscribers
 
-`shared` de‑duplicates by `key`: a single `fetch()` per tick is fanned out to every `stream()`
-collector. Polling starts on the first subscriber and stops `stopTimeoutMs` after the last leaves.
+`.shared(key)` de‑duplicates by `key`: a single fetch per tick is fanned out to every `stream()`
+collector. Polling starts on the first subscriber and stops `keepAliveFor` after the last leaves.
 
 ```kotlin
-val session = Polling.shared<List<Service>>(key = vin) {
-    fetch = { repository.getServicesList(vin).toPollingResult() }
-    backoff = BackoffPolicies.fixed(intervalMs = 10_000)            // one tick / 10s, forever
-    stopWhen = { it is PollingResult.Success && it.data.isEmpty() } // stop when the list drains
-    stopTimeoutMs = 15_000                                          // keep alive 15s after last leaves
-    replay = 1                                                      // late subscribers get the last value
-}
+val session = Polling.poll { repository.getServicesList(vin) }
+    .every(10.seconds)              // one tick / 10s, forever
+    .stopWhen { it.isEmpty() }      // stop when the list drains
+    .keepAliveFor(15.seconds)       // keep alive 15s after last subscriber leaves
+    .replayLast(1)                  // late subscribers get the last value
+    .shared(key = vin)
 
 // Two independent views fed by the SAME 10s network call:
 viewModelScope.launch {
@@ -326,24 +361,39 @@ viewModelScope.launch {
 }
 ```
 
-### Control APIs
+### Control: the handle, not ids
 
-`startPolling`/`observe` flows are controlled by cancelling their collecting `Job`. To control a
-session by id (pause/resume/updateBackoff), look it up via `listActiveIds()`:
+`.start()` / `.collect()` return a `PollHandle` — control the poll directly, no id lookups:
 
 ```kotlin
-viewModelScope.launch {
-    val id = Polling.listActiveIds().firstOrNull() ?: return@launch
-    Polling.pause(id)
-    Polling.resume(id)
-    Polling.updateBackoff(id, BackoffPolicies.fixed(intervalMs = 5_000))
-    Polling.cancel(id)
-}
+handle.pause()
+handle.resume()
+handle.retune { initialDelay = 5.seconds; maxDelay = 5.seconds }  // hot‑swap backoff
+handle.cancel()
 // Polling.cancelAll() / Polling.shutdown() for global control
 ```
 
-> **Lifecycle:** always cancel polling when the `ViewModel` is cleared (`onCleared()`), or rely on
-> `viewModelScope` cancellation, to avoid leaks.
+> **Lifecycle:** the poll stops automatically when the `scope` you pass to `.start()`/`.collect()`
+> is cancelled (e.g. `viewModelScope`), so leaks are avoided without manual teardown.
+
+## Migration from 0.2.x
+
+The builder/`PollingConfig` API is gone; everything now flows from `Polling.poll { … }`.
+
+| 0.2.x | 1.0.0 |
+|---|---|
+| `Polling.startPolling { fetch=…; isTerminalSuccess=…; backoff=BackoffPolicy(…) }.launchIn(scope)` | `Polling.poll { … }.until { … }.backoff { … }.start(scope)` |
+| `Polling.run(config)` | `Polling.poll { … }.until { … }.await()` |
+| `Polling.observe { … }.collect { … }` | `Polling.poll { … }.every(d).collect(scope) { … }` (or `.asFlow()`) |
+| `Polling.shared(key) { …; stopTimeoutMs=…; replay=… }` | `Polling.poll { … }.every(d).keepAliveFor(d).replayLast(n).shared(key)` |
+| `Polling.compose(a, b)` | `Polling.sequence(a, b)` |
+| `fetch = { PollingResult.Success(api()) }` | `Polling.poll { api() }` (plain value; throw on error) |
+| `isTerminalSuccess = { … }` | `.until { … }` |
+| `shouldRetryOnError = RetryPredicates.networkOrServerOrTimeout` | `.retryWhen(Retry.networkOrServer)` |
+| `backoff = BackoffPolicies.fixed(2_000)` | `.every(2.seconds)` |
+| `backoff = BackoffPolicy(initialDelayMs=…, …)` | `.backoff { initialDelay = …; … }` / `.atMost` / `.timeout` |
+| `listActiveIds()` + `pause(id)`/`updateBackoff(id,…)` | `val h = ….start(scope); h.pause()` / `h.retune { … }` |
+| `SharedPollingSession<T>` | `SharedPoll<T>` |
 
 ## iOS (Swift) Implementation
 
@@ -354,11 +404,14 @@ Import the framework as **`PollingEngine`**.
 
 ```kotlin
 // shared module, e.g. IosPollingHelper.kt
-import `in`.androidplay.pollingengine.models.PollingResult
-import `in`.androidplay.pollingengine.polling.*
+import `in`.androidplay.pollingengine.polling.Polling
+import `in`.androidplay.pollingengine.polling.PollingOutcome
+import `in`.androidplay.pollingengine.polling.dsl.PollHandle
+import `in`.androidplay.pollingengine.polling.dsl.Retry
 import kotlinx.coroutines.*
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
+import kotlin.time.Duration.Companion.seconds
 
 object IosPollingHelper {
 
@@ -369,25 +422,27 @@ object IosPollingHelper {
         fetch: suspend () -> String,
         onUpdate: (Int) -> Unit,
         onComplete: (PollingOutcome<String>) -> Unit,
-    ): Job = Polling.startPolling<String> {
-        this.fetch = { PollingResult.Success(fetch()) }
-        isTerminalSuccess = { it.equals("COMPLETED", ignoreCase = true) }
-        backoff = BackoffPolicies.quick20s
-        shouldRetryOnError = RetryPredicates.networkOrServerOrTimeout
-        onAttempt = { attempt, _ -> onUpdate(attempt) }
-    }.onEach { onComplete(it) }.launchIn(scope)
+    ): PollHandle<String> = Polling.poll { fetch() }
+        .until { it.equals("COMPLETED", ignoreCase = true) }
+        .every(2.seconds)
+        .retryWhen(Retry.networkOrServer)
+        .onAttempt { attempt, _ -> onUpdate(attempt) }
+        .start(scope)
+        .also { handle -> handle.outcomes.onEach { onComplete(it) }.launchIn(scope) }
 
     /** Observe: a continuous stream of every successful value. */
     fun observeQueue(
         fetch: suspend () -> Int,
         onValue: (Int) -> Unit,
-    ): Job = Polling.observe<Int> {
-        this.fetch = { PollingResult.Success(fetch()) }
-        backoff = BackoffPolicies.fixed(intervalMs = 2_000)
-        stopWhen = { it is PollingResult.Success && it.data == 0 }
-    }.onEach { onValue(it) }.launchIn(scope)
+    ): PollHandle<Int> = Polling.poll { fetch() }
+        .every(2.seconds)
+        .stopWhen { it == 0 }
+        .collect(scope) { onValue(it) }
 }
 ```
+
+> The helper returns a `PollHandle` — call `handle.cancel()` from Swift to stop the poll (no `Job`
+> bookkeeping or id lookups needed).
 
 ### SwiftUI ViewModel
 
@@ -398,11 +453,11 @@ import PollingEngine // KMP framework baseName
 @MainActor
 final class PollingViewModel: ObservableObject {
     @Published var status: String = "Idle"
-    private var job: Kotlinx_coroutines_coreJob?
+    private var poll: PollHandle?
 
     func start() {
         status = "Polling…"
-        job = IosPollingHelper.shared.startStatusPolling(
+        poll = IosPollingHelper.shared.startStatusPolling(
             fetch: { try await MyApi.shared.checkStatus() },
             onUpdate: { [weak self] attempt in self?.status = "Attempt \(attempt)" },
             onComplete: { [weak self] outcome in
@@ -423,8 +478,8 @@ final class PollingViewModel: ObservableObject {
     }
 
     func cancel() {
-        job?.cancel(cause: nil)
-        job = nil
+        poll?.cancel(completionHandler: { _, _ in })
+        poll = nil
         status = "Idle"
     }
 }
@@ -447,46 +502,46 @@ struct ContentView: View {
 }
 ```
 
-> **Tip:** `Polling.shared` and other `suspend` members are exposed to Swift as completion‑handler /
-> `async` functions. Wrap them in helper functions in the shared module (as above) to keep call
-> sites
-> clean, and collect Flows there rather than in Swift.
+> **Tip:** `.shared(key)`, `.await()`, and `PollHandle.pause/resume/cancel` are `suspend` members
+> exposed to Swift as completion‑handler / `async` functions. Wrap them in helper functions in the
+> shared module (as above) to keep call sites clean, and collect Flows there rather than in Swift.
 
 ## Backoff & Retry Reference
 
-**`BackoffPolicy`** (defaults shown):
+**Cadence.** Pick one:
+
+- `.every(2.seconds)` — constant cadence (no growth, no jitter); unbounded by default — the natural
+  fit for observe / shared.
+- `.backoff { … }` — exponential with jitter. All knobs are `Duration`/`Double` with safe defaults:
 
 ```kotlin
-BackoffPolicy(
-    initialDelayMs = 500,
-    maxDelayMs = 30_000,
-    multiplier = 2.0,
-    jitterRatio = 0.2,        // [0.0, 1.0]; 0 disables jitter
-    maxAttempts = 8,          // 0 = UNLIMITED_ATTEMPTS
-    overallTimeoutMs = 120_000, // 0 = NO_TIMEOUT
-    perAttemptTimeoutMs = null, // null disables; must be > 0 when set
-)
+.backoff {
+    initialDelay = 500.milliseconds   // delay before the 2nd attempt; grows by multiplier
+    maxDelay = 30.seconds             // ceiling the delay is clamped to
+    multiplier = 2.0                  // growth factor each round (>= 1.0)
+    jitter = 0.2                      // [0.0, 1.0]; 0 disables jitter
+    maxAttempts = 8                   // null = unlimited
+    overallTimeout = 120.seconds      // null = no overall timeout
+    perAttemptTimeout = null          // null disables; must be > 0 when set
+}
 ```
 
-Validation rejects negative values, `maxDelayMs < initialDelayMs`, and `multiplier < 1.0`.
+**Limits** (override the cadence's caps, read more clearly):
 
-**Presets** (`BackoffPolicies`):
+- `.atMost(10)` — cap the number of attempts.
+- `.timeout(2.minutes)` — cap the overall wall‑clock time.
+- `.timeoutPerAttempt(10.seconds)` — cap each attempt (a slower fetch becomes a retryable timeout).
 
-- `quick20s` — fast, ~20s overall budget, 20 attempts, 10s per‑attempt timeout.
-- `fixed(intervalMs, perAttemptTimeoutMs?, maxAttempts?, overallTimeoutMs?)` — constant cadence,
-  unbounded by default; the natural fit for `observe` / `shared`.
+Validation rejects negative values, `maxDelay < initialDelay`, and `multiplier < 1.0`.
 
-**Retry predicates** (`RetryPredicates`), passed to `shouldRetryOnError`:
+**Retry** (`.retryWhen(…)`, with `Retry` presets):
 
-- `networkOrServerOrTimeout` — retry network/server/timeout/unknown errors (recommended default).
-- `always` / `never`.
+- `Retry.networkOrServer` — retry network/server/timeout/unknown errors (recommended default).
+- `Retry.always` / `Retry.never`.
 
-**Throwable mappers** (`ThrowableMappers`), passed to `throwableMapper`, translate exceptions into a
-domain `Error` for the retry predicate:
-
-- `networkDefault` — timeouts → timeout code, else network code.
-- `iosDefault` — alias of `networkDefault`.
-- `kotlinxSerializationDefault` — serialization failures → server (bad payload), else unknown.
+**Error mapping** (`.mapErrors { throwable -> Error }`) translates a thrown exception into a domain
+`Error` for `.retryWhen`. The default maps any throwable to `Error(-1, message)`, which
+`Retry.networkOrServer` treats as retryable.
 
 ## Setup/Build Instructions
 
