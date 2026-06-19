@@ -8,8 +8,13 @@ indent_style = space
 insert_final_newline = true
 trim_trailing_whitespace = true
 
+# YAML (incl. GitHub Actions workflows) is indentation-sensitive and conventionally
+# uses 2 spaces. Without this override the global indent_size=4 makes the IDE reformat
+# workflows on save and corrupt their indentation.
+[*.{yml,yaml}]
+indent_size = 2
+
 [*.{kt,kts}]
 max_line_length = 140
-# The published Maven group is `in.androidplay`; `in` is a Kotlin keyword that
-# ktlint's standard package-name rule rejects, so disable that rule.
-ktlint_standard_package-name = disabled
+
+
