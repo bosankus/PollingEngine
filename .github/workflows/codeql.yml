@@ -1,13 +1,11 @@
 name: CodeQL
 
-# CodeQL security analysis. Runs on PRs, on every push to main, and on a weekly schedule. On main
-# this is one of the two upstream check workflows (the other is Build) that the Release workflow
-# waits on via workflow_run before it publishes — see release.yml.
+# On merge to main, CodeQL runs as jobs inside release.yml (the single release flow) so the whole
+# pipeline shows as one graph. This workflow only covers pre-merge PRs and the weekly scheduled
+# scan — it intentionally does NOT trigger on push to main to avoid a second workflow on merge.
 on:
   pull_request:
     branches: [ main, master ]
-  push:
-    branches: [ main ]
   schedule:
     - cron: '0 3 * * 1'
 
