@@ -1,9 +1,9 @@
 name: CI
 
+# Pre-merge checks run on PRs. Pushes to main are handled by release.yml (which re-runs the
+# same check suite before publishing), so this no longer triggers on push to avoid duplicate runs.
 on:
   pull_request:
-  push:
-    branches: [ main, master ]
 
 permissions:
   contents: read

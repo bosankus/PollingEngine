@@ -1,8 +1,8 @@
 name: Docs
 
+# Docs are deployed automatically by release.yml on every merge to main. This workflow is kept
+# as a manual trigger to rebuild/redeploy docs on demand without cutting a release.
 on:
-  push:
-    branches: [ main, master ]
   workflow_dispatch:
 
 permissions:

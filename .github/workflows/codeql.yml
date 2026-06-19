@@ -30,20 +30,32 @@ jobs:
       - uses: github/codeql-action/init@v3
         with:
           languages: 'java-kotlin'
-      # Custom build steps for Kotlin Multiplatform (avoid Android/iOS toolchains)
-      - name: Build Kotlin common metadata
-        run: ./gradlew :pollingengine:compileKotlinMetadata --no-daemon --stacktrace
+      # CodeQL's Kotlin extractor traces a real Kotlin/JVM compilation. The
+      # `compileKotlinMetadata` task only emits a klib (no JVM bytecode), so
+      # CodeQL reports "no source code seen" and fails. Compiling the Android
+      # target produces JVM .class files and folds in commonMain, covering all
+      # library source for analysis.
+      -   name: Build Kotlin (Android target, JVM bytecode)
+          run: ./gradlew :pollingengine:compileAndroidMain --no-daemon --stacktrace
       - uses: github/codeql-action/analyze@v3
 
   analyze-swift:
     name: Analyze (Swift)
-    runs-on: macos-latest
+    # Compose Multiplatform 1.11.x links against the iOS 26 SDK
+    # (UIViewLayoutRegion / UIUtilities), so building the iosApp Xcode project
+    # requires Xcode 26. On older images (e.g. macos-15 / Xcode 16.x) the link
+    # step fails with "Undefined symbols ... _OBJC_CLASS_$_UIViewLayoutRegion".
+    runs-on: macos-26
     permissions:
       actions: read
       contents: read
       security-events: write
     steps:
       - uses: actions/checkout@v5
+      -   name: Select Xcode 26
+          uses: maxim-lobanov/setup-xcode@v1
+          with:
+            xcode-version: latest-stable
       - uses: github/codeql-action/init@v3
         with:
           languages: 'swift'

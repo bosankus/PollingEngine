@@ -1,24 +1,80 @@
 name: Release
 
+# Auto-release pipeline. On every push to main (i.e. every merge) this runs the full
+# check suite, then bumps the patch version, builds artifacts, publishes + releases to
+# Maven Central, commits the version bump, tags v<version>, creates a GitHub Release, and
+# deploys docs. Publishing happens before the commit/tag so a failed publish never advances
+# the version. The bump commit is pushed with GITHUB_TOKEN, which does NOT re-trigger
+# workflows (no loop); the [skip ci] marker is an extra guard.
 on:
   push:
-    tags:
-      - 'v*'
+    branches: [ main ]
 
 permissions:
   contents: read
 
 concurrency:
-  group: release-${{ github.ref }}
+  group: release-main
   cancel-in-progress: false
 
 jobs:
-  publish:
+  checks:
+    name: Build and Static Checks
+    strategy:
+      fail-fast: true
+      matrix:
+        os: [ ubuntu-latest, macos-26 ]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+      - name: Select Xcode 26
+        if: runner.os == 'macOS'
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+      - name: Set up JDK 17
+        uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+            ~/.konan
+          key: ${{ runner.os }}-gradle-${{ hashFiles('**/*.gradle*', '**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
+      - name: Grant execute permission for gradlew
+        run: chmod +x gradlew
+      - name: Build
+        run: ./gradlew build --stacktrace
+      - name: Detekt
+        run: ./gradlew detekt --stacktrace
+      - name: ktlint
+        run: ./gradlew ktlintCheck --stacktrace
+      - name: Dokka HTML
+        run: ./gradlew :pollingengine:dokkaGenerate --stacktrace
+      - name: API check (if baseline present)
+        run: if [ -d api ]; then ./gradlew :pollingengine:apiCheck --stacktrace; else echo "Skipping apiCheck (no baseline)"; fi
+
+  release:
+    name: Publish to Maven Central
+    needs: checks
     runs-on: macos-latest
     permissions:
       contents: write
     steps:
       - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Select Xcode 26
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
       - name: Set up JDK 17
         uses: actions/setup-java@v5
         with:
@@ -35,27 +91,31 @@ jobs:
             ${{ runner.os }}-konan-
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
-      - name: Build library artifacts
-        run: ./gradlew :pollingengine:build :pollingengine:podPublishReleaseXCFramework --stacktrace
-      - name: Generate docs
-        run: ./gradlew :pollingengine:dokkaGenerate --stacktrace
-
-      - name: Check publish credentials
-        id: creds
+      - name: Verify publish credentials present
         env:
           MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
-          if [ -n "$MAVEN_CENTRAL_USERNAME" ] && [ -n "$SIGNING_KEY" ]; then
-            echo "ok=true" >> "$GITHUB_OUTPUT"
-          else
-            echo "ok=false" >> "$GITHUB_OUTPUT"
-            echo "::notice::Maven Central credentials not present; skipping publish."
+          if [ -z "$MAVEN_CENTRAL_USERNAME" ] || [ -z "$SIGNING_KEY" ]; then
+            echo "::error::Maven Central credentials/signing key missing; cannot publish."
+            exit 1
           fi
-
-      - name: Publish to Maven Central
-        if: steps.creds.outputs.ok == 'true'
-        run: ./gradlew :pollingengine:publishToMavenCentral --no-daemon --stacktrace
+      - name: Bump patch version
+        id: ver
+        run: |
+          FILE=gradle/libs.versions.toml
+          CURRENT=$(grep -E '^pollingengine = "' "$FILE" | head -1 | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+          if [ -z "$CURRENT" ]; then echo "::error::could not parse pollingengine version from $FILE"; exit 1; fi
+          IFS='.' read -r MA MI PA <<< "$CURRENT"
+          NEXT="$MA.$MI.$((PA + 1))"
+          sed -i '' -E "s/^pollingengine = \"$CURRENT\"/pollingengine = \"$NEXT\"/" "$FILE"
+          echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
+          echo "next=$NEXT" >> "$GITHUB_OUTPUT"
+          echo "Bumped pollingengine $CURRENT -> $NEXT"
+      - name: Build XCFramework and docs
+        run: ./gradlew :pollingengine:podPublishReleaseXCFramework :pollingengine:dokkaGenerate --stacktrace
+      - name: Publish and release to Maven Central
+        run: ./gradlew :pollingengine:publishAndReleaseToMavenCentral --no-daemon --stacktrace
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
@@ -63,7 +123,15 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
-
+      - name: Commit version bump and tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add gradle/libs.versions.toml
+          git commit -m "chore(release): v${{ steps.ver.outputs.next }} [skip ci]"
+          git tag "v${{ steps.ver.outputs.next }}"
+          git push origin HEAD:main
+          git push origin "v${{ steps.ver.outputs.next }}"
       - name: Zip XCFramework
         run: |
           cd pollingengine/build/cocoapods/publish/release
@@ -72,9 +140,10 @@ jobs:
         run: |
           cd pollingengine/build/dokka/html
           zip -r ../dokka-html.zip .
-      - name: Attach artifacts to GitHub Release
+      - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: v${{ steps.ver.outputs.next }}
           files: |
             pollingengine/build/cocoapods/publish/release/PollingEngine.xcframework.zip
             pollingengine/build/dokka/dokka-html.zip
