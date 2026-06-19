@@ -94,13 +94,12 @@ jobs:
       - uses: github/codeql-action/init@v3
         with:
           languages: 'java-kotlin'
-      # CodeQL's Kotlin extractor traces a real Kotlin/JVM compilation. The
-      # `compileKotlinMetadata` task only emits a klib (no JVM bytecode), so
-      # CodeQL reports "no source code seen" and fails. Compiling the Android
-      # target produces JVM .class files and folds in commonMain, covering all
-      # library source for analysis.
       - name: Build Kotlin (Android target, JVM bytecode)
-        run: ./gradlew :pollingengine:compileAndroidMain --no-daemon --stacktrace
+        run: >-
+          ./gradlew :pollingengine:compileAndroidMain
+          --no-daemon --no-build-cache --rerun-tasks
+          -Pkotlin.compiler.execution.strategy=in-process
+          --stacktrace
       - uses: github/codeql-action/analyze@v3
 
   # ---------------------------------------------------------------------------
