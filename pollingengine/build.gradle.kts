@@ -12,7 +12,11 @@ plugins {
 }
 
 group = "in.androidplay"
-version = libs.versions.pollingengine.get()
+// The released version is tag-driven in CI: release.yml derives it from the latest `v*` git tag and
+// passes it as `-PreleaseVersion=<x.y.z>`. The libs.versions.toml value is only the local/dev
+// fallback when no override is supplied.
+version = (project.findProperty("releaseVersion") as String?)?.takeIf { it.isNotBlank() }
+    ?: libs.versions.pollingengine.get()
 description = "PollingEngine KMP library providing robust polling with backoff and jitter"
 
 kotlin {

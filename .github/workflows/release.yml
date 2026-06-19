@@ -5,12 +5,12 @@ name: Release
 # Swift) is a job here and they all converge into the publish job, so the Actions graph shows
 # the whole flow step-by-step up to the Maven Central release.
 #
-# The publish job runs only after every check job passes (needs: [...]). It bumps the patch
-# version, builds artifacts, publishes + releases to Maven Central, commits the version bump,
-# tags v<version>, creates a GitHub Release, and deploys docs. Publishing happens before the
-# commit/tag so a failed publish never advances the version. The bump commit is pushed with
-# GITHUB_TOKEN, which does NOT re-trigger workflows (no loop); the [skip ci] marker is an extra
-# guard.
+# The publish job runs only after every check job passes (needs: [...]). Versioning is TAG-DRIVEN:
+# the last released version is read from the latest `v*` git tag, the patch is bumped, and that
+# version is injected into the build via -PreleaseVersion. The job builds artifacts, publishes +
+# releases to Maven Central, then records the release by pushing a `v<version>` tag ONLY — it does
+# NOT commit to main (main requires PRs via repository ruleset). Pushing a tag does not re-trigger
+# this workflow (it triggers on push to main, not tags), so there is no loop.
 on:
   push:
     branches: [ main ]
@@ -172,22 +172,37 @@ jobs:
             echo "::error::Maven Central credentials/signing key missing; cannot publish."
             exit 1
           fi
-      - name: Bump patch version
+      - name: Determine next version from latest release tag
         id: ver
         run: |
-          FILE=gradle/libs.versions.toml
-          CURRENT=$(grep -E '^pollingengine = "' "$FILE" | head -1 | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
-          if [ -z "$CURRENT" ]; then echo "::error::could not parse pollingengine version from $FILE"; exit 1; fi
+          # Source of truth for "last released version" is the latest v* git tag (created by this
+          # job on each release). Bump its patch to get the version we are about to publish. If no
+          # release tag exists yet, seed from gradle/libs.versions.toml.
+          git fetch --tags --force --quiet
+          LATEST=$(git tag -l 'v[0-9]*.[0-9]*.[0-9]*' --sort=-v:refname | head -1)
+          if [ -n "$LATEST" ]; then
+            CURRENT="${LATEST#v}"
+            echo "Last released tag: $LATEST (version $CURRENT)"
+          else
+            CURRENT=$(grep -E '^pollingengine = "' gradle/libs.versions.toml | head -1 | sed -E 's/.*"([0-9]+\.[0-9]+\.[0-9]+)".*/\1/')
+            echo "No release tags found; seeding from gradle/libs.versions.toml: $CURRENT"
+          fi
+          if [ -z "$CURRENT" ]; then echo "::error::could not determine current version"; exit 1; fi
           IFS='.' read -r MA MI PA <<< "$CURRENT"
           NEXT="$MA.$MI.$((PA + 1))"
-          sed -i '' -E "s/^pollingengine = \"$CURRENT\"/pollingengine = \"$NEXT\"/" "$FILE"
+          # Idempotency guard: never republish a version that already has a tag (Maven Central
+          # rejects re-releasing a version, so this would only fail later anyway).
+          if git rev-parse -q --verify "refs/tags/v$NEXT" >/dev/null; then
+            echo "::error::tag v$NEXT already exists — $NEXT was already released; aborting."
+            exit 1
+          fi
           echo "current=$CURRENT" >> "$GITHUB_OUTPUT"
           echo "next=$NEXT" >> "$GITHUB_OUTPUT"
-          echo "Bumped pollingengine $CURRENT -> $NEXT"
+          echo "Releasing $CURRENT -> $NEXT"
       - name: Build XCFramework and docs
-        run: ./gradlew :pollingengine:podPublishReleaseXCFramework :pollingengine:dokkaGenerate --stacktrace
+        run: ./gradlew :pollingengine:podPublishReleaseXCFramework :pollingengine:dokkaGenerate -PreleaseVersion=${{ steps.ver.outputs.next }} --stacktrace
       - name: Publish and release to Maven Central
-        run: ./gradlew :pollingengine:publishAndReleaseToMavenCentral --no-daemon --stacktrace
+        run: ./gradlew :pollingengine:publishAndReleaseToMavenCentral -PreleaseVersion=${{ steps.ver.outputs.next }} --no-daemon --stacktrace
         env:
           ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVENCENTRALUSERNAME }}
           ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVENCENTRALPASSWORD }}
@@ -195,14 +210,14 @@ jobs:
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyPassword: ${{ secrets.SIGNING_PASSWORD }}
-      - name: Commit version bump and tag
+      # Publishing happened above, so record the release by pushing the tag ONLY. No commit to main
+      # (main requires PRs via repository ruleset), and the tag is what the next run reads to compute
+      # the following version. Tag refs are not covered by the branch ruleset, so this push succeeds.
+      - name: Tag the release
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "github-actions[bot]@users.noreply.github.com"
-          git add gradle/libs.versions.toml
-          git commit -m "chore(release): v${{ steps.ver.outputs.next }} [skip ci]"
           git tag "v${{ steps.ver.outputs.next }}"
-          git push origin HEAD:main
           git push origin "v${{ steps.ver.outputs.next }}"
       - name: Zip XCFramework
         run: |
