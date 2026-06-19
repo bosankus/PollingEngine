@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html class="no-js" lang="en">
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" charset="UTF-8">
+    <title>PollBuilder</title>
+    <link href="../../../images/logo-icon.svg" rel="icon" type="image/svg">
+        <script>var pathToRoot = "../../../";</script>
+    <script>document.documentElement.classList.replace("no-js", "js");</script>
+    <script>const storage = localStorage.getItem("dokka-dark-mode")
+      if (storage == null) {
+        const osDarkSchemePreferred = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches
+        if (osDarkSchemePreferred === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      } else {
+        const savedDarkMode = JSON.parse(storage)
+        if (savedDarkMode === true) {
+          document.getElementsByTagName("html")[0].classList.add("theme-dark")
+        }
+      }
+    </script>
+<script type="text/javascript" src="../../../scripts/sourceset_dependencies.js" async="async"></script>
+<link href="../../../styles/style.css" rel="Stylesheet">
+<link href="../../../styles/main.css" rel="Stylesheet">
+<link href="../../../styles/prism.css" rel="Stylesheet">
+<link href="../../../styles/logo-styles.css" rel="Stylesheet">
+<link href="../../../ui-kit/ui-kit.min.css" rel="Stylesheet">
+<script type="text/javascript" src="../../../scripts/safe-local-storage_blocking.js"></script>
+<script type="text/javascript" src="../../../scripts/navigation-loader.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/platform-content-handler.js" async="async"></script>
+<script type="text/javascript" src="../../../scripts/main.js" defer="defer"></script>
+<script type="text/javascript" src="../../../scripts/prism.js" async="async"></script>
+<script type="text/javascript" src="../../../ui-kit/ui-kit.min.js" defer="defer"></script>
+</head>
+<body>
+<div class="root">
+    <header class="navigation theme-dark" id="navigation-wrapper" role="banner">
+            <a class="library-name--link" href="../../../index.html" tabindex="1">
+                    pollingengine
+            </a>
+        <button class="navigation-controls--btn navigation-controls--btn_toc ui-kit_mobile-only" id="toc-toggle"
+                type="button">Toggle table of contents
+        </button>
+        <div class="navigation-controls--break ui-kit_mobile-only"></div>
+        <div class="library-version" id="library-version">
+1.0.2        </div>
+        <div class="navigation-controls">
+        <ul class="filter-section filter-section_loading" id="filter-section" aria-label="Target filter">
+                <button class="platform-tag platform-selector common-like" data-active="" aria-pressed="true"
+                        data-filter=":pollingengine/commonMain">common</button>
+            <div class="dropdown filter-section--dropdown" data-role="dropdown" id="filter-section-dropdown">
+                <button class="button button_dropdown filter-section--dropdown-toggle" role="combobox"
+                        data-role="dropdown-toggle"
+                        aria-controls="platform-tags-listbox"
+                        aria-haspopup="listbox"
+                        aria-expanded="false"
+                        aria-label="Toggle source sets"
+                ></button>
+                <ul role="listbox" id="platform-tags-listbox" class="dropdown--list" data-role="dropdown-listbox" aria-label="Target filter">
+                    <div class="dropdown--header"><span>Target filter</span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close target filter">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                        <li role="option" class="dropdown--option platform-selector-option common-like" tabindex="0">
+                            <label class="checkbox">
+                                <input type="checkbox" class="checkbox--input" id=":pollingengine/commonMain"
+                                       data-filter=":pollingengine/commonMain"/>
+                                <span class="checkbox--icon"></span>
+                                common
+                            </label>
+                        </li>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </ul>
+            <button class="navigation-controls--btn navigation-controls--btn_theme" id="theme-toggle-button"
+                    type="button">Switch theme
+            </button>
+            <div class="navigation-controls--btn navigation-controls--btn_search" id="searchBar" role="button">Search in
+                API
+            </div>
+        </div>
+    </header>
+    <div id="container">
+        <nav id="leftColumn" class="sidebar" data-item-type="SECTION" data-item-config='{"defaultSize": 280, "minSize": 200, "maxSize": 400}'>
+            <a class="toc--skip-link" href="#main">Skip to content</a>
+            <div class="dropdown theme-dark_mobile" data-role="dropdown" id="toc-dropdown">
+                <ul role="listbox" id="toc-listbox" class="dropdown--list dropdown--list_toc-list"
+                    data-role="dropdown-listbox" aria-label="Table of contents">
+                    <div class="dropdown--header">
+                            <span>
+                                    pollingengine
+                            </span>
+                        <button class="button" data-role="dropdown-toggle" aria-label="Close table of contents">
+                            <i class="ui-kit-icon ui-kit-icon_cross"></i>
+                        </button>
+                    </div>
+                    <div class="sidebar--inner" id="sideMenu"></div>
+                </ul>
+                <div class="dropdown--overlay"></div>
+            </div>
+        </nav>
+        <div id="resizer" class="resizer" data-item-type="BAR"></div>
+        <div id="main" data-item-type="SECTION" role="main">
+<div class="main-content" data-page-type="classlike" id="content" pageIds="pollingengine::in.androidplay.pollingengine.polling.dsl/PollBuilder///PointingToDeclaration//-688490242">
+  <div class="breadcrumbs"><a href="../../../index.html">pollingengine</a><span class="delimiter">/</span><a href="../index.html">in.androidplay.pollingengine.polling.dsl</a><span class="delimiter">/</span><span class="current">PollBuilder</span></div>
+  <div class="cover ">
+    <h1 class="cover"><span>Poll</span><wbr></wbr><span><span>Builder</span></span></h1>
+    <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">class </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><p class="paragraph">Fluent description of a poll, read like a sentence and finished with a verb that picks how it runs. Start from <a href="../../in.androidplay.pollingengine.polling/-polling/poll.html"><code class="lang-kotlin">Polling.poll</code></a>:</p><div class="sample-container"><pre><code class="block lang-kotlin" theme="idea">// &quot;Poll the status until it's COMPLETED, every 2 seconds.&quot;<br>Polling.poll { api.checkStatus() }<br>    .until { it == &quot;COMPLETED&quot; }<br>    .every(2.seconds)<br>    .start(scope)</code></pre><span class="copy-tooltip"><div class="copy-popup-wrapper popup-to-left"><span class="copy-popup-icon"></span><span>Content copied to clipboard</span></div><span class="copy-icon"></span></span></div><p class="paragraph">Every refinement is optional with a production-safe default. The terminal verb decides the model: <a href="start.html">start</a>/<a href="await.html">await</a> converge to one outcome, <a href="collect.html">collect</a>/<a href="as-flow.html">asFlow</a> stream each value, <a href="shared.html">shared</a> multiplexes one loop across subscribers.</p></div></div>
+  </div>
+  <div class="tabbedcontent">
+    <div class="tabs-section" tabs-section="tabs-section"><button class="section-tab" data-active="" data-togglable="CONSTRUCTOR,TYPE,PROPERTY,FUNCTION">Members</button></div>
+    <div class="tabs-section-body">
+      <div data-togglable="FUNCTION">
+        <h2 class="tableheader">Functions</h2>
+        <div class="table"><a data-name="560246576%2FFunctions%2F-688490242" anchor-label="asFlow" id="560246576%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="as-flow.html"><span>as</span><wbr></wbr><span><span>Flow</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="560246576%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="as-flow.html"><span class="token function">asFlow</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines.flow/Flow///PointingToDeclaration/">Flow</span><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">A cold <span data-unresolved-link="kotlinx.coroutines.flow/Flow///PointingToDeclaration/">Flow</span> that emits every successful value, ideal for <code class="lang-kotlin">collectAsState</code> in Compose.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1600414920%2FFunctions%2F-688490242" anchor-label="atMost" id="-1600414920%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="at-most.html"><span>at</span><wbr></wbr><span><span>Most</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1600414920%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="at-most.html"><span class="token function">atMost</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">attempts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Cap the number of attempts.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1883973420%2FFunctions%2F-688490242" anchor-label="await" id="-1883973420%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="await.html"><span><span>await</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1883973420%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="await.html"><span class="token function">await</span></a><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../in.androidplay.pollingengine.polling/-polling-outcome/index.html">PollingOutcome</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Suspend until the poll converges and return its single <a href="../../in.androidplay.pollingengine.polling/-polling-outcome/index.html">PollingOutcome</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1126766941%2FFunctions%2F-688490242" anchor-label="backoff" id="-1126766941%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="backoff.html"><span><span>backoff</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1126766941%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="backoff.html"><span class="token function">backoff</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">spec<span class="token operator">: </span><a href="../-backoff-spec/index.html">BackoffSpec</a><span class="token punctuation">.</span><span class="token punctuation">(</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Use exponential backoff with jitter; see <a href="../-backoff-spec/index.html">BackoffSpec</a>. Overrides <a href="every.html">every</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1415204609%2FFunctions%2F-688490242" anchor-label="collect" id="1415204609%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="collect.html"><span><span>collect</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1415204609%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="collect.html"><span class="token function">collect</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">scope<span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines/CoroutineScope///PointingToDeclaration/">CoroutineScope</span><span class="token punctuation">, </span></span><span class="parameter ">onValue<span class="token operator">: </span><span class="token keyword">suspend </span><span class="token punctuation">(</span><a href="index.html">T</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-poll-handle/index.html">PollHandle</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Launch into <a href="collect.html">scope</a>, delivering every successful value to <a href="collect.html">onValue</a>, and return a <a href="../-poll-handle/index.html">PollHandle</a> for control. The poll stops when <a href="collect.html">scope</a> is cancelled or a stop condition fires.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1379164889%2FFunctions%2F-688490242" anchor-label="every" id="-1379164889%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="every.html"><span><span>every</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1379164889%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="every.html"><span class="token function">every</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">interval<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.time/-duration/index.html">Duration</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Poll at a constant cadence of <a href="every.html">interval</a> between attempts (no growth, no jitter).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-14347353%2FFunctions%2F-688490242" anchor-label="keepAliveFor" id="-14347353%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="keep-alive-for.html"><span>keep</span><wbr></wbr><span>Alive</span><wbr></wbr><span><span>For</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-14347353%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="keep-alive-for.html"><span class="token function">keepAliveFor</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">grace<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.time/-duration/index.html">Duration</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph"><a href="shared.html">shared</a> only: keep the loop alive this long after the last subscriber leaves.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1654165757%2FFunctions%2F-688490242" anchor-label="mapErrors" id="1654165757%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="map-errors.html"><span>map</span><wbr></wbr><span><span>Errors</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1654165757%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="map-errors.html"><span class="token function">mapErrors</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">mapper<span class="token operator">: </span><span class="token punctuation">(</span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-throwable/index.html">Throwable</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Map a thrown exception into a domain <a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a> for <a href="retry-when.html">retryWhen</a> and reporting.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1830771218%2FFunctions%2F-688490242" anchor-label="on" id="-1830771218%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="on.html"><span><span>on</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1830771218%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="on.html"><span class="token function">on</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">dispatcher<span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines/CoroutineDispatcher///PointingToDeclaration/">CoroutineDispatcher</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Run the poll loop on a specific dispatcher. Defaults to <span data-unresolved-link="kotlinx.coroutines/Dispatchers/Default/#/PointingToDeclaration/">Dispatchers.Default</span>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="2037795552%2FFunctions%2F-688490242" anchor-label="onAttempt" id="2037795552%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="on-attempt.html"><span>on</span><wbr></wbr><span><span>Attempt</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="2037795552%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="on-attempt.html"><span class="token function">onAttempt</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hook<span class="token operator">: </span><span class="token punctuation">(</span>attempt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>delayMs<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Called before each attempt with the attempt index and the upcoming delay (0 for immediate).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1441241295%2FFunctions%2F-688490242" anchor-label="onComplete" id="1441241295%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="on-complete.html"><span>on</span><wbr></wbr><span><span>Complete</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1441241295%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="on-complete.html"><span class="token function">onComplete</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hook<span class="token operator">: </span><span class="token punctuation">(</span>attempts<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>durationMs<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-long/index.html">Long</a><span class="token punctuation">, </span>outcome<span class="token operator">: </span><a href="../../in.androidplay.pollingengine.polling/-polling-outcome/index.html">PollingOutcome</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Called once with the terminal outcome, total attempts, and elapsed time.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="616107821%2FFunctions%2F-688490242" anchor-label="onResult" id="616107821%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="on-result.html"><span>on</span><wbr></wbr><span><span>Result</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="616107821%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="on-result.html"><span class="token function">onResult</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">hook<span class="token operator">: </span><span class="token punctuation">(</span>attempt<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a><span class="token punctuation">, </span>result<span class="token operator">: </span><a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-unit/index.html">Unit</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Called after each attempt with its <a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a>.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-1637252207%2FFunctions%2F-688490242" anchor-label="replayLast" id="-1637252207%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="replay-last.html"><span>replay</span><wbr></wbr><span><span>Last</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-1637252207%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="replay-last.html"><span class="token function">replayLast</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">count<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-int/index.html">Int</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph"><a href="shared.html">shared</a> only: replay this many recent values to late subscribers. Default 1.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="277918935%2FFunctions%2F-688490242" anchor-label="retryWhen" id="277918935%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="retry-when.html"><span>retry</span><wbr></wbr><span><span>When</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="277918935%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="retry-when.html"><span class="token function">retryWhen</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">predicate<span class="token operator">: </span><span class="token punctuation">(</span><a href="../../in.androidplay.pollingengine.models/-error/index.html">Error</a><span class="token operator">?</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Decide whether to keep polling after a failed attempt. See the <a href="../-retry/index.html">Retry</a> presets.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-862021588%2FFunctions%2F-688490242" anchor-label="shared" id="-862021588%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="shared.html"><span><span>shared</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-862021588%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">suspend </span><span class="token keyword">fun </span><a href="shared.html"><span class="token function">shared</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">key<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-any/index.html">Any</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../../in.androidplay.pollingengine.polling/-shared-poll/index.html">SharedPoll</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Create (or reuse) a multiplexed <a href="../../in.androidplay.pollingengine.polling/-shared-poll/index.html">SharedPoll</a> keyed by <a href="shared.html">key</a>; one loop fans out to all.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-10639326%2FFunctions%2F-688490242" anchor-label="start" id="-10639326%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="start.html"><span><span>start</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-10639326%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="start.html"><span class="token function">start</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">scope<span class="token operator">: </span><span data-unresolved-link="kotlinx.coroutines/CoroutineScope///PointingToDeclaration/">CoroutineScope</span></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="../-poll-handle/index.html">PollHandle</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Launch into <a href="start.html">scope</a> and return a <a href="../-poll-handle/index.html">PollHandle</a> for control. Collect <a href="../-poll-handle/outcomes.html">PollHandle.outcomes</a> for the terminal result; the poll stops when <a href="start.html">scope</a> is cancelled.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1947674921%2FFunctions%2F-688490242" anchor-label="stopWhen" id="1947674921%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="stop-when.html"><span>stop</span><wbr></wbr><span><span>When</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1947674921%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="stop-when.html"><span class="token function">stopWhen</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">predicate<span class="token operator">: </span><span class="token punctuation">(</span><a href="index.html">T</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Give up (non-success) once <a href="stop-when.html">predicate</a> holds for a fetched value.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="940287051%2FFunctions%2F-688490242" anchor-label="stopWhenResult" id="940287051%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="stop-when-result.html"><span>stop</span><wbr></wbr><span>When</span><wbr></wbr><span><span>Result</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="940287051%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="stop-when-result.html"><span class="token function">stopWhenResult</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">predicate<span class="token operator">: </span><span class="token punctuation">(</span><a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Advanced: give up based on the raw <a href="../../in.androidplay.pollingengine.models/-polling-result/index.html">PollingResult</a> (e.g. a specific failure).</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="596649313%2FFunctions%2F-688490242" anchor-label="timeout" id="596649313%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="timeout.html"><span><span>timeout</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="596649313%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="timeout.html"><span class="token function">timeout</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">budget<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.time/-duration/index.html">Duration</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Cap the overall wall-clock time across all attempts.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="-893809327%2FFunctions%2F-688490242" anchor-label="timeoutPerAttempt" id="-893809327%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="timeout-per-attempt.html"><span>timeout</span><wbr></wbr><span>Per</span><wbr></wbr><span><span>Attempt</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="-893809327%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="timeout-per-attempt.html"><span class="token function">timeoutPerAttempt</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">budget<span class="token operator">: </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin.time/-duration/index.html">Duration</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Cap each individual attempt; a slower fetch is treated as a (retryable) timeout error.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+<a data-name="1462977761%2FFunctions%2F-688490242" anchor-label="until" id="1462977761%2FFunctions%2F-688490242" data-filterable-set=":pollingengine/commonMain"></a>
+          <div class="table-row table-row_content" data-filterable-current=":pollingengine/commonMain" data-filterable-set=":pollingengine/commonMain">
+            <div class="main-subrow keyValue ">
+              <div class=""><span class="inline-flex">
+                  <div><a href="until.html"><span><span>until</span></span></a></div>
+<span class="anchor-wrapper"><span class="anchor-icon" pointing-to="1462977761%2FFunctions%2F-688490242"></span>
+                    <div class="copy-popup-wrapper "><span class="copy-popup-icon"></span><span>Link copied to clipboard</span></div>
+                  </span></span></div>
+              <div>
+                <div class="title">
+                  <div class="platform-hinted " data-platform-hinted="data-platform-hinted"><div class="content sourceset-dependent-content" data-active="" data-togglable=":pollingengine/commonMain"><div class="symbol monospace"><span class="token keyword">fun </span><a href="until.html"><span class="token function">until</span></a><span class="token punctuation">(</span><span class="parameters "><span class="parameter ">predicate<span class="token operator">: </span><span class="token punctuation">(</span><a href="index.html">T</a><span class="token punctuation">)</span><span class="token operator"> -&gt; </span><a href="https://kotlinlang.org/api/core/kotlin-stdlib/kotlin/-boolean/index.html">Boolean</a></span></span><span class="token punctuation">)</span><span class="token operator">: </span><a href="index.html">PollBuilder</a><span class="token operator">&lt;</span><a href="index.html">T</a><span class="token operator">&gt;</span></div><div class="brief "><p class="paragraph">Stop with success once <a href="until.html">predicate</a> holds for a fetched value. Omit to poll until stopped.</p></div></div></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+    <div class="footer">
+        <div class="footer--container">
+            <a href="#content" id="go-to-top-link" class="footer--button footer--button_go-to-top"></a>
+            <div class="footer--content">
+                <div>
+                    <span>Generated by </span>
+                    <a class="footer--link footer--link_external" href="https://github.com/Kotlin/dokka">
+                        Dokka
+                    </a>
+                    <div>© 2026 Copyright</div>
+                </div>
+            </div>
+        </div>
+    </div>
+        </div>
+    </div>
+</div>
+</body>
+</html>
