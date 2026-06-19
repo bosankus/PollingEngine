@@ -1,8 +1,9 @@
 name: CodeQL
 
+# On merge to main, CodeQL runs as jobs inside release.yml (the single release flow) so the whole
+# pipeline shows as one graph. This workflow only covers pre-merge PRs and the weekly scheduled
+# scan — it intentionally does NOT trigger on push to main to avoid a second workflow on merge.
 on:
-  push:
-    branches: [ main, master ]
   pull_request:
     branches: [ main, master ]
   schedule:
