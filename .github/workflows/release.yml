@@ -166,7 +166,7 @@ jobs:
         run: chmod +x gradlew
       - name: Verify publish credentials present
         env:
-          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
+          MAVEN_CENTRAL_USERNAME: ${{ secrets.MAVENCENTRALUSERNAME }}
           SIGNING_KEY: ${{ secrets.SIGNING_KEY }}
         run: |
           if [ -z "$MAVEN_CENTRAL_USERNAME" ] || [ -z "$SIGNING_KEY" ]; then
@@ -190,8 +190,8 @@ jobs:
       - name: Publish and release to Maven Central
         run: ./gradlew :pollingengine:publishAndReleaseToMavenCentral --no-daemon --stacktrace
         env:
-          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVEN_CENTRAL_USERNAME }}
-          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVEN_CENTRAL_PASSWORD }}
+          ORG_GRADLE_PROJECT_mavenCentralUsername: ${{ secrets.MAVENCENTRALUSERNAME }}
+          ORG_GRADLE_PROJECT_mavenCentralPassword: ${{ secrets.MAVENCENTRALUSERNAME }}
           SIGNING_ENABLED: 'true'
           ORG_GRADLE_PROJECT_signingInMemoryKey: ${{ secrets.SIGNING_KEY }}
           ORG_GRADLE_PROJECT_signingInMemoryKeyId: ${{ secrets.SIGNING_KEY_ID }}
