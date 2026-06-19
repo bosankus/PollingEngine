@@ -1,9 +1,12 @@
-name: CI
+name: Build
 
-# Pre-merge checks run on PRs. Pushes to main are handled by release.yml (which re-runs the
-# same check suite before publishing), so this no longer triggers on push to avoid duplicate runs.
+# Build + static analysis. Runs on PRs (pre-merge) and on every push to main. On main this is one
+# of the two upstream check workflows (the other is CodeQL) that the Release workflow waits on via
+# workflow_run before it publishes — see release.yml.
 on:
   pull_request:
+  push:
+      branches: [ main ]
 
 permissions:
   contents: read

@@ -1,11 +1,13 @@
 name: CodeQL
 
-# On merge to main, CodeQL runs as jobs inside release.yml (the single release flow) so the whole
-# pipeline shows as one graph. This workflow only covers pre-merge PRs and the weekly scheduled
-# scan — it intentionally does NOT trigger on push to main to avoid a second workflow on merge.
+# CodeQL security analysis. Runs on PRs, on every push to main, and on a weekly schedule. On main
+# this is one of the two upstream check workflows (the other is Build) that the Release workflow
+# waits on via workflow_run before it publishes — see release.yml.
 on:
   pull_request:
     branches: [ main, master ]
+  push:
+    branches: [ main ]
   schedule:
     - cron: '0 3 * * 1'
 
@@ -42,8 +44,22 @@ jobs:
       # CodeQL reports "no source code seen" and fails. Compiling the Android
       # target produces JVM .class files and folds in commonMain, covering all
       # library source for analysis.
+      #
+      # The compile MUST actually execute under CodeQL's build tracer, otherwise
+      # the finalize step fails with "no source code seen during build":
+      #   --no-build-cache + --rerun-tasks  : gradle.properties sets
+      #     org.gradle.caching=true and the gradle cache is restored above, so
+      #     without these the task is served FROM-CACHE/UP-TO-DATE and the
+      #     compiler never runs.
+      #   -Pkotlin.compiler.execution.strategy=in-process : run the Kotlin
+      #     compiler inside the traced Gradle JVM instead of a Kotlin daemon the
+      #     tracer can't see.
       -   name: Build Kotlin (Android target, JVM bytecode)
-          run: ./gradlew :pollingengine:compileAndroidMain --no-daemon --stacktrace
+          run: >-
+            ./gradlew :pollingengine:compileAndroidMain
+            --no-daemon --no-build-cache --rerun-tasks
+            -Pkotlin.compiler.execution.strategy=in-process
+            --stacktrace
       - uses: github/codeql-action/analyze@v3
 
   analyze-swift:
