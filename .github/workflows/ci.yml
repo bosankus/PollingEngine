@@ -21,7 +21,7 @@ jobs:
           os: [ ubuntu-latest, macos-26 ]
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         # Compose Multiplatform 1.11.x links against the iOS 26 SDK
         # (e.g. UIViewLayoutRegion / UIUtilities), so the iOS targets require
         # Xcode 26 to link. Without this the build fails with
@@ -37,7 +37,7 @@ jobs:
           distribution: temurin
           java-version: 17
       - name: Cache Gradle
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: |
             ~/.gradle/caches
